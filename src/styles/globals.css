@@ -1,0 +1,211 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+  
+  body {
+    @apply bg-gray-900 text-gray-100;
+    font-feature-settings: "rlig" 1, "calt" 1;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+  }
+  
+  html, body, #root {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+  }
+}
+
+@layer components {
+  .tab-item {
+    @apply flex items-center gap-3 px-3 py-2.5 mx-1 rounded-lg hover:bg-gray-800/70 transition-all duration-150 cursor-pointer text-gray-200 hover:text-white;
+  }
+  
+  .tab-item.active {
+    @apply bg-gray-800/90 text-white;
+  }
+  
+  .tab-item.stored-pinned {
+    @apply opacity-70 italic;
+  }
+  
+  .tab-favicon {
+    @apply w-4 h-4 flex-shrink-0 rounded;
+    image-rendering: -webkit-optimize-contrast;
+    image-rendering: crisp-edges;
+  }
+  
+  .tab-title {
+    @apply text-sm font-medium truncate flex-1 min-w-0;
+  }
+  
+  .tab-close {
+    @apply w-4 h-4 flex-shrink-0 opacity-0 group-hover:opacity-100 hover:bg-gray-700/60 rounded transition-all text-gray-400 hover:text-gray-200;
+  }
+  
+  .search-input {
+    @apply w-full px-3 py-2 text-sm border border-gray-700 rounded-md bg-gray-800 text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent;
+  }
+  
+  .sidebar-header {
+    @apply flex items-center justify-between p-4 bg-gray-900;
+  }
+  
+  .sidebar-content {
+    @apply flex-1 overflow-y-auto bg-gray-900 px-2;
+  }
+  
+  .section {
+    @apply mb-6 last:mb-2;
+  }
+  
+  .section-header {
+    @apply flex items-center gap-2 px-2 py-2 mb-2 cursor-pointer hover:bg-gray-800/40 rounded-lg transition-colors text-gray-400 hover:text-gray-200;
+  }
+  
+  .section-content {
+    @apply space-y-1;
+  }
+  
+  .section-menu-btn {
+    @apply p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition-colors;
+  }
+  
+  .empty-section {
+    @apply p-4 text-center;
+  }
+  
+  .bookmark-item {
+    @apply flex items-center gap-3 px-3 py-2.5 mx-1 rounded-lg hover:bg-gray-800/70 transition-all duration-150 cursor-pointer text-gray-200 hover:text-white;
+  }
+  
+  .bookmark-favicon {
+    @apply w-4 h-4 flex-shrink-0 rounded;
+    image-rendering: -webkit-optimize-contrast;
+    image-rendering: crisp-edges;
+  }
+  
+  .bookmark-title {
+    @apply text-sm font-medium truncate flex-1 min-w-0;
+  }
+  
+  .bookmark-remove {
+    @apply w-4 h-4 flex-shrink-0 opacity-0 group-hover:opacity-100 hover:bg-gray-700/60 rounded transition-all text-gray-400 hover:text-gray-200;
+  }
+
+  /* Folder Styles */
+  .folder-item {
+    @apply mb-2;
+  }
+  
+  .folder-item.drag-over {
+    @apply ring-2 ring-blue-400 ring-opacity-50 bg-blue-500/10 rounded-lg;
+  }
+  
+  .folder-header {
+    @apply flex items-center gap-2 px-3 py-2.5 mx-1 rounded-lg hover:bg-gray-800/70 transition-all duration-150 cursor-pointer text-gray-200 hover:text-white;
+  }
+  
+  .folder-name {
+    @apply text-sm font-medium;
+  }
+  
+  .folder-content {
+    @apply ml-4 mt-1 border-l border-gray-700/50 pl-3 space-y-1;
+  }
+  
+  .empty-folder {
+    @apply text-xs text-gray-500 px-3 py-2;
+  }
+  
+  .empty-folder.drop-zone-empty {
+    @apply border-2 border-dashed border-gray-700 rounded-md mx-2 my-1 py-3 text-center hover:border-gray-600 hover:bg-gray-800/30 transition-all;
+  }
+
+  .context-menu {
+    @apply bg-gray-800 border border-gray-700 rounded-lg shadow-lg py-1 min-w-48;
+  }
+  
+  .context-menu-item {
+    @apply w-full flex items-center gap-2 px-3 py-2 text-left text-sm hover:bg-gray-700 transition-colors text-gray-300 hover:text-gray-100;
+  }
+  
+  .context-menu-item.destructive {
+    @apply text-red-400 hover:bg-red-900/20 hover:text-red-300;
+  }
+
+  /* Drag and Drop Styles */
+  .tab-item.dragging,
+  .bookmark-item.dragging {
+    @apply opacity-50 transform scale-95 ring-2 ring-blue-400 ring-opacity-50;
+  }
+  
+  .section.drop-active {
+    @apply bg-blue-500/10 border-blue-400 border-2 border-dashed rounded-lg;
+  }
+  
+  .drag-handle {
+    @apply cursor-grab active:cursor-grabbing;
+  }
+  
+  .drag-handle:hover {
+    @apply text-gray-300;
+  }
+  
+  .drop-indicator {
+    @apply h-0.5 bg-blue-400 rounded-full my-1 transition-all duration-200;
+  }
+  
+  .drop-zone {
+    @apply min-h-12 border-2 border-dashed border-gray-600 rounded-lg flex items-center justify-center text-gray-500 transition-all;
+  }
+  
+  .drop-zone.active {
+    @apply border-blue-400 bg-blue-500/10 text-blue-400;
+  }
+  
+  /* Drop Separator */
+  .drop-separator {
+    @apply h-0.5 bg-blue-400 rounded-full mx-3 my-1 opacity-0 transition-opacity duration-200;
+  }
+  
+  .drop-separator.active {
+    @apply opacity-100;
+  }
+  
+  /* Inline Editing */
+  .inline-edit-input {
+    @apply bg-gray-800 text-white text-sm px-2 py-1 rounded border border-gray-600 focus:outline-none focus:border-blue-400 w-full;
+  }
+  
+  /* Today Section Separator */
+  .today-separator {
+    @apply my-3 px-3;
+  }
+  
+  .separator-line {
+    @apply h-px bg-gray-700/50;
+  }
+  
+  /* Loading Animation */
+  @keyframes pulse {
+    0%, 100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.5;
+    }
+  }
+  
+  .skeleton {
+    @apply bg-gray-800 rounded animate-pulse;
+  }
+  
+  .skeleton-tab {
+    @apply h-10 mx-1 mb-1 rounded-lg bg-gray-800 animate-pulse;
+  }
+}
