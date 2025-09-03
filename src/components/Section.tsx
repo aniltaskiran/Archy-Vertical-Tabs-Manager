@@ -1,5 +1,5 @@
-import React from 'react'
-import { ChevronDown, ChevronRight, Star, Clock, Folder, Archive, MoreHorizontal, Loader2 } from 'lucide-react'
+import React, { useState } from 'react'
+import { ChevronDown, ChevronRight, Star, Clock, Folder, Archive, MoreHorizontal, Loader2, X } from 'lucide-react'
 import { Section as SectionType, Tab, Bookmark, Folder as FolderType } from '../types'
 import TabItem from './TabItem'
 import BookmarkItem from './BookmarkItem'
@@ -64,6 +64,7 @@ export default function Section({
   dropIndicator,
   newFolderId
 }: SectionProps) {
+  const [isHoveringToday, setIsHoveringToday] = useState(false)
   const handleHeaderClick = () => {
     onToggleCollapse(section.id)
   }
@@ -94,8 +95,40 @@ export default function Section({
       className="section"
       {...dropProps}
     >
-      {/* Section Header - Only hide for favorites */}
-      {section.type !== 'favorites' && (
+      {/* Section Header - Different styles for different sections */}
+      {section.type === 'today' ? (
+        <div 
+          className="today-header group"
+          onMouseEnter={() => setIsHoveringToday(true)}
+          onMouseLeave={() => setIsHoveringToday(false)}
+        >
+          <div className="today-separator-line" />
+          <span className="today-label">Today</span>
+          <div className="today-separator-line" />
+          {isHoveringToday && section.items.length > 0 && (
+            <button
+              className="clear-all-button"
+              onClick={async () => {
+                // Close all tabs in Today section
+                const tabsToClose = section.items.filter(item => 'windowId' in item) as Tab[]
+                for (const tab of tabsToClose) {
+                  if (tab.id > 0) {
+                    try {
+                      await chrome.tabs.remove(tab.id)
+                    } catch (error) {
+                      console.error('Error closing tab:', error)
+                    }
+                  }
+                }
+              }}
+              title="Close all tabs"
+            >
+              <X className="w-3 h-3" />
+              <span>Clear All</span>
+            </button>
+          )}
+        </div>
+      ) : section.type !== 'favorites' ? (
         <div 
           className="section-header group"
           onClick={handleHeaderClick}
@@ -112,10 +145,10 @@ export default function Section({
             </span>
           </div>
         </div>
-      )}
+      ) : null}
 
-      {/* Section Content */}
-      {(section.type === 'favorites' || !section.collapsed) && (
+      {/* Section Content - Today is always visible */}
+      {(section.type === 'favorites' || section.type === 'today' || !section.collapsed) && (
         <div className="section-content">
           {isLoading ? (
             <div className="space-y-1">

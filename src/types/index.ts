@@ -54,7 +54,7 @@ export interface Folder {
   name: string
   type: 'folder'
   collapsed: boolean
-  items: Bookmark[]
+  items: (Bookmark | Folder)[]  // Allow nested folders
 }
 
 export interface ArchivedTab extends Tab {

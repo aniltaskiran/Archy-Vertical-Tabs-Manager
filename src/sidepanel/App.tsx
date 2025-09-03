@@ -17,6 +17,15 @@ import {
   createChromeFolder,
   addBookmarkToFolder
 } from '../utils/chromeBookmarks'
+import {
+  addTabToArchyGroup,
+  removeTabFromArchyGroup,
+  createTabInArchyGroup,
+  getArchyGroupTabs,
+  syncFavoritesToTabGroup,
+  getArchyGroupId,
+  reorderArchyGroupTabs
+} from '../utils/chromeTabGroups'
 import { 
   loadSections, 
   saveSections, 
@@ -66,7 +75,7 @@ export default function App() {
     // Debug logging disabled
   }
 
-  const loadTabs = async () => {
+  const loadTabs = async (preserveState: boolean = true) => {
     try {
       setTabsLoading(true)
       const chromeWindows = await chrome.windows.getAll({ populate: true })
@@ -109,15 +118,57 @@ export default function App() {
       // Save pinned tabs to storage
       await savePinnedTabs(pinnedTabs)
       
-      // Always load existing sections from storage first to preserve favorites/folders
+      // Get Archy group ID
+      const currentWindow = await chrome.windows.getCurrent()
+      const archyGroupId = await getArchyGroupId(currentWindow.id)
+      
+      // Get current sections or load from storage
       let currentSections = sections
       if (currentSections.length === 0) {
         currentSections = await loadSections()
       }
       
+      // Preserve folder collapse states if requested
+      const folderStates = new Map<string, boolean>()
+      if (preserveState) {
+        currentSections.forEach(section => {
+          if (section.type === 'favorites') {
+            section.items.forEach(item => {
+              if ('type' in item && item.type === 'folder') {
+                folderStates.set(item.id, item.collapsed)
+              }
+            })
+          }
+        })
+      }
+      
       // Update ONLY the today section, preserving favorites and other sections
-      const updatedSections = await updateTodaySection(currentSections, allTabs)
-      setSections(updatedSections)
+      // Pass archyGroupId to exclude those tabs from Today
+      const updatedSections = await updateTodaySection(currentSections, allTabs, archyGroupId)
+      
+      // Restore folder collapse states
+      if (preserveState && folderStates.size > 0) {
+        const finalSections = updatedSections.map(section => {
+          if (section.type === 'favorites') {
+            return {
+              ...section,
+              items: section.items.map(item => {
+                if ('type' in item && item.type === 'folder' && folderStates.has(item.id)) {
+                  return {
+                    ...item,
+                    collapsed: folderStates.get(item.id)!
+                  }
+                }
+                return item
+              })
+            }
+          }
+          return section
+        })
+        setSections(finalSections)
+      } else {
+        setSections(updatedSections)
+      }
       // Don't save sections here as it would overwrite user changes to favorites
       // Only save when user explicitly makes changes
       
@@ -131,12 +182,77 @@ export default function App() {
   const loadAppData = async () => {
     // Always load sections from storage to preserve user changes
     const sectionsData = await loadSections()
-    setSections(sectionsData)
     
-    // Sync favorites with Chrome bookmarks on load
+    const currentWindow = await chrome.windows.getCurrent()
+    
+    // First, sync existing favorites to Chrome tab group
     const favoritesSection = sectionsData.find(s => s.type === 'favorites')
     if (favoritesSection) {
-      await syncFavoritesWithChrome(favoritesSection)
+      // Get all bookmark URLs from favorites (excluding folders)
+      const favoriteBookmarks = favoritesSection.items
+        .filter(item => 'url' in item && !('type' in item && item.type === 'folder'))
+        .map(item => ({
+          url: (item as Bookmark).url,
+          title: (item as Bookmark).title
+        }))
+      
+      // Also get bookmarks from folders
+      favoritesSection.items.forEach(item => {
+        if ('type' in item && item.type === 'folder') {
+          const folder = item as Folder
+          folder.items.forEach(bookmark => {
+            favoriteBookmarks.push({
+              url: bookmark.url,
+              title: bookmark.title
+            })
+          })
+        }
+      })
+      
+      // Open all favorites as tabs in the Archy group
+      if (favoriteBookmarks.length > 0) {
+        console.log('Syncing favorites to Chrome tab group:', favoriteBookmarks)
+        await syncFavoritesToTabGroup(favoriteBookmarks, currentWindow.id)
+      }
+    }
+    
+    // Get tabs from Archy group
+    const archyTabs = await getArchyGroupTabs(currentWindow.id)
+    
+    // Update favorites section with tabs from Archy group
+    const updatedSections = sectionsData.map(section => {
+      if (section.type === 'favorites') {
+        // Keep existing folders and bookmarks, add new ones from tab group
+        const existingUrls = new Set(
+          section.items
+            .filter(item => 'url' in item)
+            .map(item => (item as Bookmark).url)
+        )
+        
+        // Add tabs from Archy group that aren't already in favorites
+        const newBookmarks = archyTabs
+          .filter(tab => tab.url && !existingUrls.has(tab.url))
+          .map(tab => ({
+            id: `bookmark-${Date.now()}-${Math.random()}`,
+            title: tab.title || 'Untitled',
+            url: tab.url!,
+            favicon: tab.favIconUrl
+          }))
+        
+        return {
+          ...section,
+          items: [...section.items, ...newBookmarks]
+        }
+      }
+      return section
+    })
+    
+    setSections(updatedSections)
+    
+    // Sync with Chrome bookmarks
+    const updatedFavoritesSection = updatedSections.find(s => s.type === 'favorites')
+    if (updatedFavoritesSection) {
+      await syncFavoritesWithChrome(updatedFavoritesSection)
     }
   }
 
@@ -158,7 +274,7 @@ export default function App() {
         }
       }
       // Reload tabs after action
-      setTimeout(() => loadTabs(), 100)
+      setTimeout(() => loadTabs(true), 100)
     } catch (error) {
       console.error('Error switching to tab:', error)
     }
@@ -197,7 +313,7 @@ export default function App() {
         }
       }
       
-      loadTabs()
+      loadTabs(true)
     } catch (error) {
       console.error('Error closing/unpinning tab:', error)
     }
@@ -220,44 +336,71 @@ export default function App() {
   }
 
   const handleSectionToggle = async (sectionId: string) => {
+    // Don't allow toggling the Today section
+    const section = sections.find(s => s.id === sectionId)
+    if (section?.type === 'today') return
+    
     const updatedSections = toggleSectionCollapse(sections, sectionId)
     setSections(updatedSections)
     await saveSections(updatedSections)
   }
 
   const handleAddToFavorites = async (tab: Tab) => {
-    console.log('Adding to favorites:', tab)
-    const bookmark = createBookmarkFromTab(tab)
-    console.log('Created bookmark:', bookmark)
+    console.log('Adding to favorites (tab group):', tab)
     
-    // Ensure we have sections loaded
-    let currentSections = sections
-    if (currentSections.length === 0) {
-      console.log('No sections found, loading from storage')
-      currentSections = await loadSections()
+    try {
+      // Add tab to Chrome's Archy tab group
+      const chromeTab = await chrome.tabs.get(tab.id)
+      await addTabToArchyGroup(chromeTab)
+      
+      // Also add to our favorites section for display in sidebar
+      const bookmark = createBookmarkFromTab(tab)
+      
+      // Ensure we have sections loaded
+      let currentSections = sections
+      if (currentSections.length === 0) {
+        console.log('No sections found, loading from storage')
+        currentSections = await loadSections()
+      }
+      
+      // Check if favorites section exists
+      const hasFavorites = currentSections.some(s => s.type === 'favorites')
+      if (!hasFavorites) {
+        console.log('No favorites section found, creating default sections')
+        currentSections = createDefaultSections()
+      }
+      
+      const updatedSections = addBookmarkToFavorites(currentSections, bookmark)
+      console.log('Updated sections:', updatedSections)
+      setSections(updatedSections)
+      await saveSections(updatedSections)
+      
+      console.log('Added tab to Archy group and saved to storage')
+      
+      // Reload tabs to remove from Today section (since it's now in Archy group)
+      // Use a small delay to ensure Chrome has updated the tab group
+      setTimeout(() => {
+        loadTabs(true) // Preserve folder states
+      }, 200)
+    } catch (error) {
+      console.error('Error adding to favorites:', error)
     }
-    
-    // Check if favorites section exists
-    const hasFavorites = currentSections.some(s => s.type === 'favorites')
-    if (!hasFavorites) {
-      console.log('No favorites section found, creating default sections')
-      currentSections = createDefaultSections()
-    }
-    
-    const updatedSections = addBookmarkToFavorites(currentSections, bookmark)
-    console.log('Updated sections:', updatedSections)
-    setSections(updatedSections)
-    await saveSections(updatedSections)
-    
-    // Add to Chrome bookmarks
-    await addChromeBookmark(bookmark.url, bookmark.title)
-    
-    console.log('Saved sections to storage and Chrome bookmarks')
   }
 
   const handleBookmarkClick = async (bookmark: Bookmark) => {
     try {
-      await chrome.tabs.create({ url: bookmark.url })
+      // Check if tab already exists in Archy group
+      const currentWindow = await chrome.windows.getCurrent()
+      const archyTabs = await getArchyGroupTabs(currentWindow.id)
+      const existingTab = archyTabs.find(t => t.url === bookmark.url)
+      
+      if (existingTab) {
+        // Switch to existing tab
+        await chrome.tabs.update(existingTab.id!, { active: true })
+      } else {
+        // Create new tab in Archy group
+        await createTabInArchyGroup(bookmark.url, bookmark.title, currentWindow.id)
+      }
     } catch (error) {
       console.error('Error opening bookmark:', error)
     }
@@ -278,7 +421,10 @@ export default function App() {
       const updatedSections = archiveTab(sections, tab)
       setSections(updatedSections)
       await saveSections(updatedSections)
-      loadTabs()
+      // Reload with state preservation
+      setTimeout(() => {
+        loadTabs(true)
+      }, 200)
     } catch (error) {
       console.error('Error archiving tab:', error)
     }
@@ -355,6 +501,50 @@ export default function App() {
     
     return newFolder.id
   }
+  
+  const handleCreateSubfolder = async (parentFolder: Folder) => {
+    // Create a new subfolder
+    const newSubfolder = createFolder('New Subfolder')
+    
+    // Add subfolder to parent folder
+    const updatedSections = sections.map(section => {
+      if (section.type === 'favorites') {
+        const updateFolderRecursively = (items: any[]): any[] => {
+          return items.map(item => {
+            if ('type' in item && item.type === 'folder' && item.id === parentFolder.id) {
+              // Found the parent folder, add subfolder
+              return {
+                ...item,
+                items: [...item.items, newSubfolder]
+              }
+            } else if ('type' in item && item.type === 'folder') {
+              // Recursively check nested folders
+              return {
+                ...item,
+                items: updateFolderRecursively(item.items)
+              }
+            }
+            return item
+          })
+        }
+        
+        return {
+          ...section,
+          items: updateFolderRecursively(section.items)
+        }
+      }
+      return section
+    })
+    
+    setSections(updatedSections)
+    await saveSections(updatedSections)
+    
+    // Track the new folder ID to trigger auto-edit
+    setNewFolderId(newSubfolder.id)
+    setTimeout(() => setNewFolderId(null), 100)
+    
+    return newSubfolder.id
+  }
 
   const handleFolderContextMenu = (folder: Folder, position: { x: number; y: number }) => {
     setFolderContextMenu({ folder, position })
@@ -399,76 +589,86 @@ export default function App() {
         // Convert tab to bookmark
         bookmarkToAdd = createBookmarkFromTab(item as Tab)
       } else {
-        // Create a new bookmark object to avoid reference issues
-        bookmarkToAdd = {
-          id: `bookmark-${Date.now()}-${Math.random()}`,
-          title: item.title,
-          url: item.url,
-          favicon: item.favicon || item.favIconUrl
-        }
+        // Use existing bookmark
+        bookmarkToAdd = item as Bookmark
       }
       
       console.log('Bookmark to add:', bookmarkToAdd)
       
-      // Find the current favorites section and the target folder
-      const favoritesSection = sections.find(s => s.type === 'favorites')
-      if (!favoritesSection) {
-        console.error('Favorites section not found')
+      // If it's a bookmark from favorites, use moveBookmarkToFolder
+      if (type === 'bookmark' && sectionId === 'favorites') {
+        const updatedSections = moveBookmarkToFolder(sections, bookmarkToAdd.id, folder.id)
+        setSections(updatedSections)
+        await saveSections(updatedSections)
+        console.log('Moved bookmark to folder using moveBookmarkToFolder')
+        
+        // Sync with Chrome bookmarks and reorder tab group
+        const updatedFavoritesSection = updatedSections.find(s => s.type === 'favorites')
+        if (updatedFavoritesSection) {
+          await syncFavoritesWithChrome(updatedFavoritesSection)
+          
+          // Reorder tabs in Archy group
+          const currentWindow = await chrome.windows.getCurrent()
+          const favoriteBookmarks: Array<{url: string, title: string}> = []
+          
+          // Get all bookmarks from favorites (including folders)
+          updatedFavoritesSection.items.forEach(item => {
+            if ('url' in item && !('type' in item && item.type === 'folder')) {
+              favoriteBookmarks.push({
+                url: (item as Bookmark).url,
+                title: (item as Bookmark).title
+              })
+            } else if ('type' in item && item.type === 'folder') {
+              const folder = item as Folder
+              folder.items.forEach(bookmark => {
+                favoriteBookmarks.push({
+                  url: bookmark.url,
+                  title: bookmark.title
+                })
+              })
+            }
+          })
+          
+          await reorderArchyGroupTabs(favoriteBookmarks, currentWindow.id)
+        }
         return
       }
       
-      // Find the target folder in the current state
-      const targetFolder = favoritesSection.items.find(
-        item => 'type' in item && item.type === 'folder' && item.id === folder.id
-      ) as Folder | undefined
-      
-      if (!targetFolder) {
-        console.error('Target folder not found')
-        return
-      }
-      
-      // Check if bookmark already exists in folder
-      const alreadyInFolder = targetFolder.items.some(folderItem => 
-        folderItem.url === bookmarkToAdd.url
-      )
-      
-      if (alreadyInFolder) {
-        console.log('Item already exists in folder')
-        return
-      }
-      
-      // Update sections
+      // For tabs from Today section or new bookmarks, add them to the folder
       const updatedSections = sections.map(section => {
         if (section.type === 'favorites') {
-          let updatedItems = [...section.items]
-          
-          // Remove from root if it's a bookmark from favorites
-          if (sectionId === 'favorites' && type === 'bookmark') {
-            updatedItems = updatedItems.filter((item, idx) => {
-              // Remove the item if it matches the index and is not a folder
-              if (idx === index && !('type' in item && item.type === 'folder')) {
-                console.log('Removing item from root at index:', idx)
-                return false
+          const addToFolderRecursively = (items: any[]): any[] => {
+            return items.map(item => {
+              if ('type' in item && item.type === 'folder' && item.id === folder.id) {
+                // Check if bookmark already exists in this folder
+                const alreadyExists = item.items.some((folderItem: any) => 
+                  'url' in folderItem && folderItem.url === bookmarkToAdd.url
+                )
+                
+                if (alreadyExists) {
+                  console.log('Item already exists in folder')
+                  return item
+                }
+                
+                console.log('Adding to folder:', folder.name)
+                return {
+                  ...item,
+                  items: [...item.items, bookmarkToAdd]
+                }
+              } else if ('type' in item && item.type === 'folder') {
+                // Recursively check nested folders
+                return {
+                  ...item,
+                  items: addToFolderRecursively(item.items)
+                }
               }
-              return true
+              return item
             })
           }
           
-          // Update the target folder
-          updatedItems = updatedItems.map(item => {
-            if ('type' in item && item.type === 'folder' && item.id === folder.id) {
-              console.log('Adding to folder:', folder.name)
-              return {
-                ...item,
-                items: [...item.items, bookmarkToAdd]
-              }
-            }
-            return item
-          })
-          
           return {
             ...section,
-            items: updatedItems
+            items: addToFolderRecursively(section.items)
           }
         }
         return section
@@ -479,11 +679,35 @@ export default function App() {
       await saveSections(updatedSections)
       console.log('Saved to storage')
       
-      // Sync with Chrome bookmarks
+      // Sync with Chrome bookmarks and reorder tab group
       const updatedFavoritesSection = updatedSections.find(s => s.type === 'favorites')
       if (updatedFavoritesSection) {
         await syncFavoritesWithChrome(updatedFavoritesSection)
         console.log('Synced with Chrome bookmarks')
+        
+        // Reorder tabs in Archy group
+        const currentWindow = await chrome.windows.getCurrent()
+        const favoriteBookmarks: Array<{url: string, title: string}> = []
+        
+        // Get all bookmarks from favorites (including folders)
+        updatedFavoritesSection.items.forEach(item => {
+          if ('url' in item && !('type' in item && item.type === 'folder')) {
+            favoriteBookmarks.push({
+              url: (item as Bookmark).url,
+              title: (item as Bookmark).title
+            })
+          } else if ('type' in item && item.type === 'folder') {
+            const folder = item as Folder
+            folder.items.forEach(bookmark => {
+              favoriteBookmarks.push({
+                url: bookmark.url,
+                title: bookmark.title
+              })
+            })
+          }
+        })
+        
+        await reorderArchyGroupTabs(favoriteBookmarks, currentWindow.id)
       }
     }
   }
@@ -552,7 +776,7 @@ export default function App() {
           const updatedPinnedTabs = pinnedTabs.filter(t => t.url !== tab.url)
           await savePinnedTabs(updatedPinnedTabs)
           
-          setTimeout(() => loadTabs(), 100)
+          setTimeout(() => loadTabs(true), 100)
           return
         } catch (error) {
           console.error('Error unpinning tab:', error)
@@ -563,7 +787,7 @@ export default function App() {
       if (!tab.pinned && targetIndex !== undefined && targetIndex < pinnedCount) {
         try {
           await chrome.tabs.update(tab.id, { pinned: true })
-          setTimeout(() => loadTabs(), 100)
+          setTimeout(() => loadTabs(true), 100)
           return
         } catch (error) {
           console.error('Error pinning tab:', error)
@@ -585,7 +809,7 @@ export default function App() {
         await chrome.tabs.move(tab.id, { index: newIndex })
         
         // Reload tabs to reflect the change
-        setTimeout(() => loadTabs(), 100)
+        setTimeout(() => loadTabs(true), 100)
         return
       } catch (error) {
         console.error('Error moving Chrome tab:', error)
@@ -658,11 +882,35 @@ export default function App() {
       setSections(updatedSections)
       await saveSections(updatedSections)
       
-      // Sync with Chrome bookmarks if favorites section was modified
+      // Sync with Chrome bookmarks and tab group if favorites section was modified
       if (targetSectionId === 'favorites' || dragData.sectionId === 'favorites') {
         const favoritesSection = updatedSections.find(s => s.type === 'favorites')
         if (favoritesSection) {
           await syncFavoritesWithChrome(favoritesSection)
+          
+          // Reorder tabs in Archy group based on new favorites order
+          const currentWindow = await chrome.windows.getCurrent()
+          const favoriteBookmarks = favoritesSection.items
+            .filter(item => 'url' in item && !('type' in item && item.type === 'folder'))
+            .map(item => ({
+              url: (item as Bookmark).url,
+              title: (item as Bookmark).title
+            }))
+          
+          // Also include bookmarks from folders
+          favoritesSection.items.forEach(item => {
+            if ('type' in item && item.type === 'folder') {
+              const folder = item as Folder
+              folder.items.forEach(bookmark => {
+                favoriteBookmarks.push({
+                  url: bookmark.url,
+                  title: bookmark.title
+                })
+              })
+            }
+          })
+          
+          await reorderArchyGroupTabs(favoriteBookmarks, currentWindow.id)
         }
       }
     }
@@ -734,7 +982,7 @@ export default function App() {
       // Load tabs asynchronously after a short delay
       const loadTabsAsync = async () => {
         await new Promise(resolve => setTimeout(resolve, 100))
-        await loadTabs()
+        await loadTabs(false) // Don't preserve state on initial load
         setIsInitialized(true)
       }
       loadTabsAsync()
@@ -776,29 +1024,93 @@ export default function App() {
     }
   }, [])
 
-  // Tab listeners effect with debouncing
+  // Tab listeners effect with debouncing and smart updates
   useEffect(() => {
     if (!isInitialized) return
 
     let updateTimeout: NodeJS.Timeout
+    let pendingUpdates = new Set<string>()
     
-    const debouncedLoadTabs = () => {
+    const debouncedLoadTabs = (updateType: string) => {
+      pendingUpdates.add(updateType)
       clearTimeout(updateTimeout)
       updateTimeout = setTimeout(() => {
-        loadTabs()
+        // Check what kind of updates we need
+        const needsFullReload = pendingUpdates.has('created') || 
+                               pendingUpdates.has('removed') || 
+                               pendingUpdates.has('pinned')
+        
+        if (needsFullReload) {
+          loadTabs(true) // Preserve folder states
+        } else {
+          // Just update active states without full reload
+          updateActiveStates()
+        }
+        
+        pendingUpdates.clear()
       }, 300) // Debounce for 300ms
+    }
+    
+    const updateActiveStates = async () => {
+      try {
+        const chromeWindows = await chrome.windows.getAll({ populate: true })
+        const allTabs: Tab[] = []
+        
+        for (const window of chromeWindows) {
+          if (window.type === 'normal' && window.tabs) {
+            window.tabs.forEach(tab => {
+              allTabs.push({
+                id: tab.id!,
+                url: tab.url || '',
+                title: tab.title || 'Untitled',
+                favIconUrl: tab.favIconUrl,
+                active: tab.active,
+                pinned: tab.pinned,
+                windowId: tab.windowId,
+                index: tab.index,
+                groupId: tab.groupId === -1 ? undefined : tab.groupId
+              })
+            })
+          }
+        }
+        
+        // Only update the active states in existing sections
+        setSections(prevSections => {
+          return prevSections.map(section => {
+            if (section.type === 'today') {
+              return {
+                ...section,
+                items: section.items.map(item => {
+                  if ('windowId' in item) {
+                    const updatedTab = allTabs.find(t => t.id === item.id)
+                    if (updatedTab) {
+                      return { ...item, active: updatedTab.active }
+                    }
+                  }
+                  return item
+                })
+              }
+            }
+            return section
+          })
+        })
+      } catch (error) {
+        console.error('Error updating active states:', error)
+      }
     }
 
     const handleTabUpdated = (tabId: number, changeInfo: chrome.tabs.TabChangeInfo, tab: chrome.tabs.Tab) => {
-      // Only reload if important properties changed
-      if (changeInfo.status === 'complete' || changeInfo.pinned !== undefined || changeInfo.title || changeInfo.favIconUrl) {
-        debouncedLoadTabs()
+      // Categorize the type of change
+      if (changeInfo.pinned !== undefined) {
+        debouncedLoadTabs('pinned')
+      } else if (changeInfo.status === 'complete' || changeInfo.title || changeInfo.favIconUrl) {
+        debouncedLoadTabs('updated')
       }
     }
-    const handleTabCreated = () => debouncedLoadTabs()
-    const handleTabRemoved = () => debouncedLoadTabs()
-    const handleTabActivated = () => debouncedLoadTabs()
-
+    
+    const handleTabCreated = () => debouncedLoadTabs('created')
+    const handleTabRemoved = () => debouncedLoadTabs('removed')
+    const handleTabActivated = () => debouncedLoadTabs('activated')
 
     chrome.tabs.onUpdated.addListener(handleTabUpdated)
     chrome.tabs.onCreated.addListener(handleTabCreated)
@@ -994,7 +1306,7 @@ export default function App() {
           onClose={() => setFolderContextMenu(null)}
           onRename={handleRenameFolder}
           onDelete={handleDeleteFolder}
-          onCreateSubfolder={handleCreateFolder}
+          onCreateSubfolder={(parentFolder) => handleCreateSubfolder(parentFolder)}
         />
       )}
     </div>

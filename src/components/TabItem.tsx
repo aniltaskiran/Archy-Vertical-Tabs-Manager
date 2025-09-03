@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
-import { X, Pin, GripVertical, Minus } from 'lucide-react'
+import { X, Pin, GripVertical, Minus, Star } from 'lucide-react'
 import { Tab } from '../types'
+import { getArchyGroupId } from '../utils/chromeTabGroups'
 
 interface TabItemProps {
   tab: Tab
@@ -30,11 +31,24 @@ export default function TabItem({
   const [isEditing, setIsEditing] = useState(false)
   const [editTitle, setEditTitle] = useState(tab.title)
   const [isHovered, setIsHovered] = useState(false)
+  const [isInArchyGroup, setIsInArchyGroup] = useState(false)
 
   // Determine if tab exists in actual Chrome tabs
   const [tabExists, setTabExists] = useState(true)
 
   React.useEffect(() => {
+    // Check if tab is in Archy group
+    const checkTabGroup = async () => {
+      if (tab.id > 0 && tab.groupId) {
+        try {
+          const group = await chrome.tabGroups.get(tab.groupId)
+          setIsInArchyGroup(group.title === 'Archy Favorites')
+        } catch (error) {
+          setIsInArchyGroup(false)
+        }
+      }
+    }
+    
     if (tab.pinned && isTodaySection) {
       // Check if this is a stored tab (negative ID)
       if (tab.id < 0) {
@@ -49,7 +63,9 @@ export default function TabItem({
         })
       }
     }
-  }, [tab.id, tab.pinned, isTodaySection])
+    
+    checkTabGroup()
+  }, [tab.id, tab.pinned, tab.groupId, isTodaySection])
 
   const handleCloseClick = (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -118,7 +134,7 @@ export default function TabItem({
         <div className="drop-separator active" />
       )}
       <div 
-        className={`tab-item group ${tab.active ? 'active' : ''} ${!tabExists && tab.pinned ? 'stored-pinned' : ''}`}
+        className={`tab-item group ${tab.active ? 'active' : ''} ${!tabExists && tab.pinned ? 'stored-pinned' : ''} ${isInArchyGroup ? 'in-archy-group' : ''}`}
         onClick={isEditing ? undefined : onClick}
         onContextMenu={handleContextMenu}
         onDoubleClick={handleDoubleClick}
@@ -149,6 +165,10 @@ export default function TabItem({
           
           {tab.pinned && (
             <Pin className="w-3 h-3 text-gray-500 flex-shrink-0" />
+          )}
+          
+          {isInArchyGroup && (
+            <Star className="w-3 h-3 text-blue-400 flex-shrink-0" title="In Archy Favorites group" />
           )}
           
           {isEditing ? (

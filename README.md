@@ -2,7 +2,7 @@
 
 A powerful Chrome extension for managing tabs vertically with AI-powered organization, inspired by Arc browser's design.
 
-![Version](https://img.shields.io/badge/version-1.0.0-blue)
+![Version](https://img.shields.io/badge/version-0.0.2-blue)
 ![Chrome Extension](https://img.shields.io/badge/Chrome-Extension-green)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 
@@ -116,7 +116,30 @@ Archy-Vertical-Tabs-Manager/
 
 ## Release Notes
 
-### Version 1.0.0 (Current)
+### Version 0.0.2 (Current)
+#### New Features
+- ✅ Chrome Tab Groups integration for favorites
+- ✅ Nested subfolder support (unlimited levels)
+- ✅ Drag tabs directly into folders from Today section
+- ✅ Smart differential updates (folders don't collapse on tab changes)
+- ✅ Clear All button for Today section
+- ✅ Improved drag and drop with proper move semantics
+- ✅ Tab group order syncing with favorites
+
+#### Improvements
+- Today section is now non-collapsible with separator design
+- Favorites excluded from Today section (no duplicates)
+- Better state preservation during updates
+- Enhanced folder drop zone detection
+- Visual indicators for tabs in Archy group
+
+#### Bug Fixes
+- Fixed folder drag and drop not saving properly
+- Fixed folders collapsing on tab changes
+- Fixed move to folder functionality
+- Fixed tab group synchronization
+
+### Version 0.0.1 (Initial Release)
 #### New Features
 - ✅ Vertical tabs in Chrome side panel
 - ✅ Drag and drop functionality

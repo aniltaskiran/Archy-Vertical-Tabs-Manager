@@ -33,6 +33,10 @@
     @apply opacity-70 italic;
   }
   
+  .tab-item.in-archy-group {
+    @apply border-l-2 border-blue-400;
+  }
+  
   .tab-favicon {
     @apply w-4 h-4 flex-shrink-0 rounded;
     image-rendering: -webkit-optimize-contrast;
@@ -118,6 +122,15 @@
     @apply ml-4 mt-1 border-l border-gray-700/50 pl-3 space-y-1;
   }
   
+  /* Nested folder styles */
+  .folder-item .folder-item {
+    @apply ml-2;
+  }
+  
+  .folder-item .folder-item .folder-content {
+    @apply ml-3 border-l-gray-700/30;
+  }
+  
   .empty-folder {
     @apply text-xs text-gray-500 px-3 py-2;
   }
@@ -189,6 +202,23 @@
   
   .separator-line {
     @apply h-px bg-gray-700/50;
+  }
+  
+  /* Today Header */
+  .today-header {
+    @apply flex items-center gap-2 px-3 py-2 mb-2 relative;
+  }
+  
+  .today-separator-line {
+    @apply flex-1 h-px bg-gray-700/30;
+  }
+  
+  .today-label {
+    @apply text-xs font-medium text-gray-500 px-2;
+  }
+  
+  .clear-all-button {
+    @apply absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1 px-2 py-1 text-xs text-gray-400 hover:text-gray-200 bg-gray-800/80 hover:bg-gray-700/80 rounded transition-all duration-200;
   }
   
   /* Loading Animation */

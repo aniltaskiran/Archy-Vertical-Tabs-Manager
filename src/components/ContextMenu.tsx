@@ -50,7 +50,7 @@ export default function ContextMenu({
   const menuItems = [
     {
       icon: Star,
-      label: 'Add to Favorites',
+      label: 'Add to Tab Group',
       action: () => {
         onAddToFavorites(tab)
         onClose()

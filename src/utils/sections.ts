@@ -185,12 +185,17 @@ export function archiveTab(sections: Section[], tab: Tab): Section[] {
 
 // Update ONLY the today section with current tabs and stored pinned tabs
 // This preserves all other sections (favorites, archives, etc.)
-export async function updateTodaySection(sections: Section[], activeTabs: Tab[]): Promise<Section[]> {
+export async function updateTodaySection(sections: Section[], activeTabs: Tab[], archyGroupId?: number | null): Promise<Section[]> {
   const storedPinnedTabs = await loadPinnedTabs()
+  
+  // Filter out tabs that are in the Archy Favorites group
+  const filteredActiveTabs = archyGroupId 
+    ? activeTabs.filter(tab => tab.groupId !== archyGroupId)
+    : activeTabs
   
   // Create a map of active tabs by URL for quick lookup
   const activeTabsByUrl = new Map<string, Tab>()
-  activeTabs.forEach(tab => {
+  filteredActiveTabs.forEach(tab => {
     if (tab.url) {
       activeTabsByUrl.set(tab.url, tab)
     }
@@ -200,8 +205,8 @@ export async function updateTodaySection(sections: Section[], activeTabs: Tab[])
   const mergedTabs: Tab[] = []
   const seenUrls = new Set<string>()
   
-  // First add all active pinned tabs
-  activeTabs.forEach(tab => {
+  // First add all active pinned tabs (excluding Archy group)
+  filteredActiveTabs.forEach(tab => {
     if (tab.pinned) {
       mergedTabs.push(tab)
       seenUrls.add(tab.url)
@@ -222,8 +227,8 @@ export async function updateTodaySection(sections: Section[], activeTabs: Tab[])
     }
   })
   
-  // Finally add all unpinned active tabs
-  activeTabs.forEach(tab => {
+  // Finally add all unpinned active tabs (excluding Archy group)
+  filteredActiveTabs.forEach(tab => {
     if (!tab.pinned) {
       mergedTabs.push(tab)
     }

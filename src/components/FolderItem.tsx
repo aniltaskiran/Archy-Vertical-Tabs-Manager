@@ -97,51 +97,51 @@ export default function FolderItem({
       <div 
         className={`folder-item ${isDragOver ? 'drag-over' : ''}`}
         onContextMenu={handleContextMenu}
+        onDragOver={(e) => {
+          // Allow drop on the entire folder
+          e.preventDefault()
+          e.stopPropagation()
+          setIsDragOver(true)
+          e.dataTransfer.dropEffect = 'copy'
+        }}
+        onDragLeave={(e) => {
+          e.preventDefault()
+          e.stopPropagation()
+          // Check if we're actually leaving the folder
+          const rect = e.currentTarget.getBoundingClientRect()
+          const isLeaving = e.clientX < rect.left || 
+                           e.clientX > rect.right || 
+                           e.clientY < rect.top || 
+                           e.clientY > rect.bottom
+          if (isLeaving) {
+            setIsDragOver(false)
+          }
+        }}
+        onDrop={(e) => {
+          e.preventDefault()
+          e.stopPropagation()
+          setIsDragOver(false)
+          
+          // Handle drop into folder
+          if (onDropIntoFolder) {
+            try {
+              const data = e.dataTransfer.getData('text/plain')
+              console.log('Dropped data into folder:', data)
+              if (data) {
+                const dragData = JSON.parse(data)
+                onDropIntoFolder(folder, dragData)
+              }
+            } catch (error) {
+              console.error('Error handling drop into folder:', error)
+            }
+          }
+        }}
         {...(dragProps || {})}
       >
         <div 
           className="folder-header group"
           onClick={handleToggleCollapse}
           onDoubleClick={handleDoubleClick}
-          onDragOver={(e) => {
-            e.preventDefault()
-            e.stopPropagation()
-            setIsDragOver(true)
-            e.dataTransfer.dropEffect = 'copy'
-          }}
-          onDragLeave={(e) => {
-            e.preventDefault()
-            e.stopPropagation()
-            // Only set to false if leaving the folder entirely
-            const rect = e.currentTarget.getBoundingClientRect()
-            if (
-              e.clientX < rect.left ||
-              e.clientX > rect.right ||
-              e.clientY < rect.top ||
-              e.clientY > rect.bottom
-            ) {
-              setIsDragOver(false)
-            }
-          }}
-          onDrop={(e) => {
-            e.preventDefault()
-            e.stopPropagation()
-            setIsDragOver(false)
-            
-            // Handle drop into folder
-            if (onDropIntoFolder) {
-              try {
-                const data = e.dataTransfer.getData('text/plain')
-                console.log('Dropped data into folder:', data)
-                if (data) {
-                  const dragData = JSON.parse(data)
-                  onDropIntoFolder(folder, dragData)
-                }
-              } catch (error) {
-                console.error('Error handling drop into folder:', error)
-              }
-            }
-          }}
         >
           {dragProps?.draggable && !isEditing && (
             <div className="drag-handle-container">
@@ -217,26 +217,46 @@ export default function FolderItem({
           >
             {folder.items.length === 0 ? (
               <div className="empty-folder drop-zone-empty">
-                Drop items here
+                Drop tabs or bookmarks here
               </div>
             ) : (
-              folder.items.map((bookmark, bookmarkIndex) => {
-                // Create drag props with correct folder context
-                const bookmarkDragProps = getDragPropsForBookmark ? 
-                  getDragPropsForBookmark(bookmark, bookmarkIndex) : undefined
-                
-                return (
-                  <BookmarkItem
-                    key={`folder-bookmark-${bookmark.id}`}
-                    bookmark={bookmark}
-                    onClick={() => onBookmarkClick?.(bookmark)}
-                    onRemove={() => onBookmarkRemove?.(bookmark)}
-                    onContextMenu={onBookmarkContextMenu}
-                    dragProps={bookmarkDragProps}
-                    sectionId={`folder-${folder.id}`}
-                    index={bookmarkIndex}
-                  />
-                )
+              folder.items.map((item, itemIndex) => {
+                // Check if item is a nested folder
+                if ('type' in item && item.type === 'folder') {
+                  // Render nested folder recursively
+                  return (
+                    <FolderItem
+                      key={`nested-folder-${item.id}`}
+                      folder={item}
+                      onToggleCollapse={onToggleCollapse}
+                      onBookmarkClick={onBookmarkClick}
+                      onBookmarkRemove={onBookmarkRemove}
+                      onBookmarkContextMenu={onBookmarkContextMenu}
+                      onFolderContextMenu={onFolderContextMenu}
+                      onFolderRename={onFolderRename}
+                      onDropIntoFolder={onDropIntoFolder}
+                      getDragPropsForBookmark={getDragPropsForBookmark}
+                      autoEdit={false}
+                    />
+                  )
+                } else {
+                  // Render bookmark
+                  const bookmarkDragProps = getDragPropsForBookmark ? 
+                    getDragPropsForBookmark(item as Bookmark, itemIndex) : undefined
+                  
+                  return (
+                    <BookmarkItem
+                      key={`folder-bookmark-${item.id}`}
+                      bookmark={item as Bookmark}
+                      onClick={() => onBookmarkClick?.(item as Bookmark)}
+                      onRemove={() => onBookmarkRemove?.(item as Bookmark)}
+                      onContextMenu={onBookmarkContextMenu}
+                      dragProps={bookmarkDragProps}
+                      sectionId={`folder-${folder.id}`}
+                      index={itemIndex}
+                    />
+                  )
+                }
               })
             )}
           </div>
