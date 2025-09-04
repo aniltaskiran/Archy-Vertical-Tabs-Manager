@@ -7,6 +7,13 @@ chrome.runtime.onInstalled.addListener(() => {
   console.log('Archy extension installed')
 })
 
+// Handle keyboard shortcut to open Archy in new tab
+chrome.commands.onCommand.addListener((command) => {
+  if (command === 'open-archy-tab') {
+    chrome.tabs.create({ url: chrome.runtime.getURL('src/newtab/index.html') })
+  }
+})
+
 // Handle extension icon click and keyboard shortcut
 // This must be synchronous to preserve user gesture context
 chrome.action.onClicked.addListener((tab) => {

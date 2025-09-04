@@ -1,0 +1,147 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer components {
+  /* New Tab Container */
+  .newtab-container {
+    @apply min-h-screen bg-gray-900 text-gray-100;
+    display: flex;
+    flex-direction: column;
+  }
+  
+  .newtab-container.fullscreen {
+    @apply p-6;
+  }
+  
+  .newtab-container.sidebar {
+    @apply p-4;
+    max-width: 600px;
+    margin: 0 auto;
+  }
+  
+  /* Header */
+  .newtab-header {
+    @apply flex items-center justify-between mb-6 pb-4 border-b border-gray-800;
+  }
+  
+  .newtab-brand {
+    @apply flex items-baseline gap-2;
+  }
+  
+  .newtab-brand h1 {
+    @apply text-2xl font-bold text-blue-400;
+  }
+  
+  .newtab-subtitle {
+    @apply text-sm text-gray-500;
+  }
+  
+  .newtab-controls {
+    @apply flex items-center gap-2;
+  }
+  
+  .newtab-control-btn {
+    @apply p-2 rounded-lg bg-gray-800 hover:bg-gray-700 transition-colors;
+  }
+  
+  /* Content */
+  .newtab-content {
+    @apply flex-1 overflow-auto;
+  }
+  
+  .newtab-sections.grid-layout {
+    @apply grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6;
+  }
+  
+  .newtab-sections.sidebar-layout {
+    @apply flex flex-col gap-4;
+  }
+  
+  .newtab-section-wrapper {
+    @apply bg-gray-800/50 rounded-lg p-4 backdrop-blur-sm;
+    min-height: 200px;
+    max-height: 600px;
+    overflow-y: auto;
+  }
+  
+  .newtab-section-wrapper::-webkit-scrollbar {
+    width: 6px;
+  }
+  
+  .newtab-section-wrapper::-webkit-scrollbar-track {
+    @apply bg-gray-800 rounded;
+  }
+  
+  .newtab-section-wrapper::-webkit-scrollbar-thumb {
+    @apply bg-gray-600 rounded hover:bg-gray-500;
+  }
+  
+  /* Footer */
+  .newtab-footer {
+    @apply flex items-center justify-between mt-6 pt-4 border-t border-gray-800 text-sm text-gray-500;
+  }
+  
+  .newtab-stats {
+    @apply flex items-center gap-2;
+  }
+  
+  .newtab-shortcuts kbd {
+    @apply px-2 py-1 mx-1 bg-gray-800 rounded text-xs font-mono;
+  }
+  
+  /* Loading State */
+  .newtab-loading {
+    @apply flex flex-col items-center justify-center h-screen gap-4;
+  }
+  
+  .spinner {
+    @apply w-12 h-12 border-4 border-gray-700 border-t-blue-400 rounded-full animate-spin;
+  }
+  
+  /* Responsive Design */
+  @media (max-width: 768px) {
+    .newtab-container.fullscreen {
+      @apply p-3;
+    }
+    
+    .newtab-sections.grid-layout {
+      @apply grid-cols-1;
+    }
+    
+    .newtab-header {
+      @apply flex-col gap-4;
+    }
+    
+    .newtab-footer {
+      @apply flex-col gap-2 text-center;
+    }
+  }
+  
+  /* Dark mode optimizations */
+  @media (prefers-color-scheme: light) {
+    .newtab-container {
+      @apply bg-gray-50 text-gray-900;
+    }
+    
+    .newtab-header {
+      @apply border-gray-200;
+    }
+    
+    .newtab-section-wrapper {
+      @apply bg-white/70;
+    }
+    
+    .newtab-control-btn {
+      @apply bg-gray-200 hover:bg-gray-300;
+    }
+    
+    .newtab-footer {
+      @apply border-gray-200 text-gray-600;
+    }
+    
+    .newtab-shortcuts kbd {
+      @apply bg-gray-200;
+    }
+  }
+}
