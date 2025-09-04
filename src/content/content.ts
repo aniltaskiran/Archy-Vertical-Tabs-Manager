@@ -1,11 +1,29 @@
 // Content script for Archy overlay
 let isOpen = false
 let overlayContainer: HTMLElement | null = null
+let selectedIndex = 0
+let visibleTabs: HTMLElement[] = []
 
-// Track ESC key to close overlay
+// Track keyboard navigation
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && isOpen) {
-    closeOverlay()
+  if (!isOpen) return
+  
+  switch(e.key) {
+    case 'Escape':
+      closeOverlay()
+      break
+    case 'ArrowDown':
+      e.preventDefault()
+      navigateDown()
+      break
+    case 'ArrowUp':
+      e.preventDefault()
+      navigateUp()
+      break
+    case 'Enter':
+      e.preventDefault()
+      selectCurrentTab()
+      break
   }
 })
 
@@ -59,6 +77,7 @@ function openOverlay() {
   if (!overlayContainer) return
   
   isOpen = true
+  selectedIndex = 0
   overlayContainer.style.display = 'flex'
   overlayContainer.classList.add('archy-opening')
   
@@ -97,8 +116,8 @@ function renderTabs(tabs: any[]) {
   const tabsList = document.querySelector('#archy-tabs-list')
   if (!tabsList) return
   
-  tabsList.innerHTML = tabs.map(tab => `
-    <div class="archy-tab-item" data-tab-id="${tab.id}" data-window-id="${tab.windowId}">
+  tabsList.innerHTML = tabs.map((tab, index) => `
+    <div class="archy-tab-item" data-tab-id="${tab.id}" data-window-id="${tab.windowId}" data-index="${index}">
       <img src="${tab.favIconUrl || chrome.runtime.getURL('icons/icon-16.png')}" alt="" class="archy-tab-favicon">
       <div class="archy-tab-content">
         <div class="archy-tab-title">${tab.title}</div>
@@ -109,6 +128,12 @@ function renderTabs(tabs: any[]) {
       </div>
     </div>
   `).join('')
+  
+  // Update visible tabs list and highlight first item
+  updateVisibleTabs()
+  if (visibleTabs.length > 0) {
+    highlightTab(0)
+  }
   
   // Add click handlers
   document.querySelectorAll('.archy-tab-item').forEach(item => {
@@ -163,6 +188,54 @@ function handleSearch(e: Event) {
       (item as HTMLElement).style.display = 'none'
     }
   })
+  
+  // Update visible tabs after filtering
+  updateVisibleTabs()
+  if (visibleTabs.length > 0) {
+    highlightTab(0)
+  }
+}
+
+// Navigation functions
+function updateVisibleTabs() {
+  visibleTabs = Array.from(document.querySelectorAll('.archy-tab-item'))
+    .filter(item => (item as HTMLElement).style.display !== 'none') as HTMLElement[]
+}
+
+function highlightTab(index: number) {
+  // Remove highlight from all tabs
+  document.querySelectorAll('.archy-tab-item').forEach(item => {
+    item.classList.remove('archy-selected')
+  })
+  
+  // Add highlight to selected tab
+  if (visibleTabs[index]) {
+    visibleTabs[index].classList.add('archy-selected')
+    selectedIndex = index
+    
+    // Scroll into view if needed
+    visibleTabs[index].scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+  }
+}
+
+function navigateDown() {
+  if (visibleTabs.length === 0) return
+  const newIndex = (selectedIndex + 1) % visibleTabs.length
+  highlightTab(newIndex)
+}
+
+function navigateUp() {
+  if (visibleTabs.length === 0) return
+  const newIndex = selectedIndex === 0 ? visibleTabs.length - 1 : selectedIndex - 1
+  highlightTab(newIndex)
+}
+
+function selectCurrentTab() {
+  if (visibleTabs[selectedIndex]) {
+    const tabId = parseInt(visibleTabs[selectedIndex].getAttribute('data-tab-id') || '0')
+    const windowId = parseInt(visibleTabs[selectedIndex].getAttribute('data-window-id') || '0')
+    switchToTab(tabId, windowId)
+  }
 }
 
 // Listen for messages from background
