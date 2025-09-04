@@ -7,10 +7,17 @@ chrome.runtime.onInstalled.addListener(() => {
   console.log('Archy extension installed')
 })
 
-// Handle keyboard shortcut to open Archy in new tab
+// Handle keyboard shortcuts
 chrome.commands.onCommand.addListener((command) => {
   if (command === 'open-archy-tab') {
     chrome.tabs.create({ url: chrome.runtime.getURL('src/newtab/index.html') })
+  } else if (command === 'open-archy-overlay') {
+    // Send message to current tab to toggle overlay
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      if (tabs[0]?.id) {
+        chrome.tabs.sendMessage(tabs[0].id, { type: 'TOGGLE_OVERLAY' })
+      }
+    })
   }
 })
 
@@ -104,12 +111,16 @@ chrome.windows.onFocusChanged.addListener((windowId) => {
   }
 })
 
-// Handle messages from the side panel
+// Handle messages from the side panel and content script
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   switch (message.type) {
     case 'GET_ALL_TABS':
       getAllTabs().then(sendResponse)
       return true // Will respond asynchronously
+
+    case 'GET_TABS_FOR_OVERLAY':
+      getTabsForOverlay().then(sendResponse)
+      return true
 
     case 'SWITCH_TO_TAB':
       switchToTab(message.tabId, message.windowId).then(sendResponse)
@@ -186,5 +197,29 @@ async function createNewTab(windowId?: number) {
   } catch (error) {
     console.error('Error creating new tab:', error)
     return { success: false, error: error.message }
+  }
+}
+
+async function getTabsForOverlay() {
+  try {
+    const tabs = await chrome.tabs.query({})
+    return { 
+      tabs: tabs.filter(tab => 
+        tab.url && 
+        !tab.url.startsWith('chrome://') && 
+        !tab.url.startsWith('chrome-extension://')
+      ).map(tab => ({
+        id: tab.id,
+        title: tab.title || 'Untitled',
+        url: tab.url || '',
+        favIconUrl: tab.favIconUrl || '',
+        windowId: tab.windowId,
+        active: tab.active,
+        pinned: tab.pinned
+      }))
+    }
+  } catch (error) {
+    console.error('Error getting tabs for overlay:', error)
+    return { tabs: [] }
   }
 }

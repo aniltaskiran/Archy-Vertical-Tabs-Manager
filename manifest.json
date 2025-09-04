@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Archy - Vertical Tabs Manager",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "AI-powered vertical tabs manager for organized and efficient browsing",
   "permissions": [
     "tabs",
@@ -17,6 +17,23 @@
   "side_panel": {
     "default_path": "src/sidepanel/index.html"
   },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["src/content/content.js"],
+      "css": ["src/content/overlay.css"],
+      "run_at": "document_end"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "src/content/overlay.html",
+        "icons/*"
+      ],
+      "matches": ["<all_urls>"]
+    }
+  ],
   "action": {
     "default_title": "Open Archy Sidebar",
     "default_icon": {
@@ -46,6 +63,13 @@
         "mac": "Command+Shift+E"
       },
       "description": "Open Archy in new tab"
+    },
+    "open-archy-overlay": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+K",
+        "mac": "Command+Shift+K"
+      },
+      "description": "Open Archy overlay"
     }
   },
   "content_security_policy": {
