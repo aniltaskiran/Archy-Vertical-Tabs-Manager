@@ -70,11 +70,11 @@ export default function Section({
   }
 
   const isTab = (item: Tab | Bookmark | FolderType): item is Tab => {
-    return 'windowId' in item
+    return item && 'windowId' in item
   }
 
   const isFolder = (item: Tab | Bookmark | FolderType): item is FolderType => {
-    return 'type' in item && item.type === 'folder'
+    return item && 'type' in item && item.type === 'folder'
   }
 
   // Separate pinned and unpinned items for Today section
@@ -110,7 +110,7 @@ export default function Section({
               className="clear-all-button"
               onClick={async () => {
                 // Close all tabs in Today section
-                const tabsToClose = section.items.filter(item => 'windowId' in item) as Tab[]
+                const tabsToClose = section.items.filter(item => item && 'windowId' in item) as Tab[]
                 for (const tab of tabsToClose) {
                   if (tab.id > 0) {
                     try {
@@ -171,6 +171,9 @@ export default function Section({
             </div>
           ) : (
             allItemsForDisplay.map((item, displayIndex) => {
+              // Skip null/undefined items
+              if (!item) return null
+              
               // Calculate the actual index in the original items array
               const index = section.items.indexOf(item)
               
@@ -197,7 +200,7 @@ export default function Section({
                 const dropProps = getDropPropsForItem ? getDropPropsForItem(section.id, index) : undefined
                 elements.push(
                   <TabItem
-                    key={`tab-${item.id}`}
+                    key={`tab-${item?.id || displayIndex}`}
                     tab={item}
                     onClick={() => onTabClick?.(item)}
                     onClose={() => onTabClose?.(item)}
@@ -217,7 +220,7 @@ export default function Section({
                 const dropProps = getDropPropsForItem ? getDropPropsForItem(section.id, index) : undefined
                 elements.push(
                   <FolderItem
-                    key={`folder-${item.id}`}
+                    key={`folder-${item?.id || displayIndex}`}
                     folder={item}
                     onToggleCollapse={onFolderToggleCollapse!}
                     onBookmarkClick={onBookmarkClick}
@@ -240,7 +243,7 @@ export default function Section({
                       }
                       return undefined
                     }}
-                    autoEdit={newFolderId === item.id}
+                    autoEdit={item && newFolderId === item.id}
                   />
                 )
                 return elements
@@ -249,7 +252,7 @@ export default function Section({
                 const dropProps = getDropPropsForItem ? getDropPropsForItem(section.id, index) : undefined
                 elements.push(
                   <BookmarkItem
-                    key={`bookmark-${item.id}`}
+                    key={`bookmark-${item?.id || displayIndex}`}
                     bookmark={item}
                     onClick={() => onBookmarkClick?.(item)}
                     onRemove={() => onBookmarkRemove?.(item)}

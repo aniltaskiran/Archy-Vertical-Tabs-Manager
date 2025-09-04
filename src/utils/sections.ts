@@ -118,7 +118,7 @@ export function removeTabFromSection(sections: Section[], sectionId: string, tab
       return {
         ...section,
         items: section.items.filter(item => 
-          'id' in item && typeof item.id === 'number' ? item.id !== tabId : true
+          item && 'id' in item && typeof item.id === 'number' ? item.id !== tabId : true
         )
       }
     }
@@ -132,7 +132,7 @@ export function addBookmarkToFavorites(sections: Section[], bookmark: Bookmark):
     if (section.type === 'favorites') {
       // Check if bookmark already exists (by URL)
       const exists = section.items.some(item => 
-        'url' in item && item.url === bookmark.url
+        item && 'url' in item && item.url === bookmark.url
       )
       
       if (exists) {
@@ -157,7 +157,7 @@ export function removeBookmarkFromFavorites(sections: Section[], bookmarkId: str
       return {
         ...section,
         items: section.items.filter(item => 
-          'id' in item && typeof item.id === 'string' ? item.id !== bookmarkId : true
+          item && 'id' in item && typeof item.id === 'string' ? item.id !== bookmarkId : true
         )
       }
     }
@@ -299,7 +299,7 @@ export function removeFolder(sections: Section[], folderId: string): Section[] {
   return sections.map(section => ({
     ...section,
     items: section.items.filter(item => 
-      'type' in item && item.type === 'folder' && item.id === folderId ? false : true
+      item && 'type' in item && item.type === 'folder' && item.id === folderId ? false : true
     )
   }))
 }
@@ -309,7 +309,7 @@ export function toggleFolderCollapse(sections: Section[], folderId: string): Sec
   return sections.map(section => ({
     ...section,
     items: section.items.map(item => {
-      if ('type' in item && item.type === 'folder' && item.id === folderId) {
+      if (item && 'type' in item && item.type === 'folder' && item.id === folderId) {
         return {
           ...item,
           collapsed: !item.collapsed
@@ -325,7 +325,7 @@ export function addBookmarkToFolder(sections: Section[], folderId: string, bookm
   return sections.map(section => ({
     ...section,
     items: section.items.map(item => {
-      if ('type' in item && item.type === 'folder' && item.id === folderId) {
+      if (item && 'type' in item && item.type === 'folder' && item.id === folderId) {
         return {
           ...item,
           items: [...item.items, bookmark]
@@ -341,10 +341,10 @@ export function removeBookmarkFromFolder(sections: Section[], folderId: string, 
   return sections.map(section => ({
     ...section,
     items: section.items.map(item => {
-      if ('type' in item && item.type === 'folder' && item.id === folderId) {
+      if (item && 'type' in item && item.type === 'folder' && item.id === folderId) {
         return {
           ...item,
-          items: item.items.filter(bookmark => bookmark.id !== bookmarkId)
+          items: item.items.filter(bookmark => bookmark && bookmark.id !== bookmarkId)
         }
       }
       return item
@@ -360,16 +360,16 @@ export function moveBookmarkToFolder(sections: Section[], bookmarkId: string, ta
   let updatedSections = sections.map(section => ({
     ...section,
     items: section.items.filter(item => {
-      if ('url' in item && item.id === bookmarkId) {
+      if (item && 'url' in item && item.id === bookmarkId) {
         bookmarkToMove = item
         return false
       }
       return true
     }).map(item => {
       // Also check inside folders
-      if ('type' in item && item.type === 'folder') {
+      if (item && 'type' in item && item.type === 'folder') {
         const filteredItems = item.items.filter(bookmark => {
-          if (bookmark.id === bookmarkId) {
+          if (bookmark && bookmark.id === bookmarkId) {
             bookmarkToMove = bookmark
             return false
           }
@@ -394,7 +394,7 @@ export function renameFolder(sections: Section[], folderId: string, newName: str
   return sections.map(section => ({
     ...section,
     items: section.items.map(item => {
-      if ('type' in item && item.type === 'folder' && item.id === folderId) {
+      if (item && 'type' in item && item.type === 'folder' && item.id === folderId) {
         return {
           ...item,
           name: newName

@@ -221,6 +221,9 @@ export default function FolderItem({
               </div>
             ) : (
               folder.items.map((item, itemIndex) => {
+                // Skip null/undefined items
+                if (!item) return null
+                
                 // Check if item is a nested folder
                 if ('type' in item && item.type === 'folder') {
                   // Render nested folder recursively
@@ -246,7 +249,7 @@ export default function FolderItem({
                   
                   return (
                     <BookmarkItem
-                      key={`folder-bookmark-${item.id}`}
+                      key={`folder-bookmark-${item?.id || itemIndex}`}
                       bookmark={item as Bookmark}
                       onClick={() => onBookmarkClick?.(item as Bookmark)}
                       onRemove={() => onBookmarkRemove?.(item as Bookmark)}

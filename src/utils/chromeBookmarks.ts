@@ -92,11 +92,15 @@ export async function moveChromeBookmark(
     
     const bookmark = children.find(child => child.url === url)
     if (bookmark) {
+      // Ensure index is within valid bounds
+      const maxIndex = Math.max(0, children.length - 1)
+      const safeIndex = Math.min(Math.max(0, newIndex), maxIndex)
+      
       await chrome.bookmarks.move(bookmark.id, {
         parentId: folder.id,
-        index: newIndex
+        index: safeIndex
       })
-      console.log('Moved Chrome bookmark:', url, 'to index:', newIndex)
+      console.log('Moved Chrome bookmark:', url, 'to index:', safeIndex)
     }
   } catch (error) {
     console.error('Error moving Chrome bookmark:', error)
@@ -114,75 +118,131 @@ export async function syncFavoritesWithChrome(favoritesSection: any): Promise<vo
       // Track which existing items we've matched
       const matchedIds = new Set<string>()
       
+      // First, remove items that no longer exist to avoid index conflicts
+      const itemUrls = new Set(items.filter(item => item && 'url' in item).map(item => item.url))
+      const itemFolderNames = new Set(items.filter(item => item && 'type' in item && item.type === 'folder').map(item => item.name))
+      
+      for (const child of existingChildren) {
+        const shouldKeep = child.url ? itemUrls.has(child.url) : itemFolderNames.has(child.title)
+        if (!shouldKeep) {
+          try {
+            await chrome.bookmarks.remove(child.id)
+            console.log('Removed orphaned Chrome item:', child.title)
+          } catch (removeError) {
+            console.error('Error removing bookmark:', removeError)
+          }
+        }
+      }
+      
+      // Re-fetch children after removal
+      const updatedChildren = await chrome.bookmarks.getChildren(parentId)
+      
       for (let i = 0; i < items.length; i++) {
         const item = items[i]
         
-        if ('type' in item && item.type === 'folder') {
+        if (item && 'type' in item && item.type === 'folder') {
           // Handle folder
-          let folderNode = existingChildren.find(child => 
+          let folderNode = updatedChildren.find(child => 
             !child.url && child.title === item.name
           )
           
           if (!folderNode) {
             // Create new folder
-            folderNode = await chrome.bookmarks.create({
-              parentId,
-              title: item.name,
-              index: i
-            })
-            console.log('Created Chrome folder:', item.name)
+            try {
+              // Don't specify index when creating, let Chrome handle it
+              folderNode = await chrome.bookmarks.create({
+                parentId,
+                title: item.name
+              })
+              console.log('Created Chrome folder:', item.name)
+              
+              // Move to correct position after creation
+              if (folderNode.index !== i && i < updatedChildren.length + 1) {
+                await chrome.bookmarks.move(folderNode.id, {
+                  parentId,
+                  index: Math.min(i, updatedChildren.length)
+                })
+              }
+            } catch (createError) {
+              console.error('Error creating folder:', createError)
+              continue
+            }
           } else {
             matchedIds.add(folderNode.id)
-            // Update position if needed
+            // Update position if needed, with bounds checking
             if (folderNode.index !== i) {
-              await chrome.bookmarks.move(folderNode.id, {
-                parentId,
-                index: i
-              })
+              try {
+                const maxIndex = await chrome.bookmarks.getChildren(parentId).then(children => children.length - 1)
+                await chrome.bookmarks.move(folderNode.id, {
+                  parentId,
+                  index: Math.min(i, maxIndex)
+                })
+              } catch (moveError) {
+                console.error('Error moving folder:', moveError)
+              }
             }
           }
           
           // Recursively sync folder contents
-          const folderChildren = await chrome.bookmarks.getChildren(folderNode.id)
-          await syncItems(item.items || [], folderNode.id, folderChildren)
-        } else if ('url' in item) {
+          if (folderNode) {
+            try {
+              const folderChildren = await chrome.bookmarks.getChildren(folderNode.id)
+              await syncItems(item.items || [], folderNode.id, folderChildren)
+            } catch (syncError) {
+              console.error('Error syncing folder contents:', syncError)
+            }
+          }
+        } else if (item && 'url' in item) {
           // Handle bookmark
-          let bookmarkNode = existingChildren.find(child => 
+          let bookmarkNode = updatedChildren.find(child => 
             child.url === item.url
           )
           
           if (!bookmarkNode) {
             // Create new bookmark
-            await chrome.bookmarks.create({
-              parentId,
-              title: item.title,
-              url: item.url,
-              index: i
-            })
-            console.log('Created Chrome bookmark:', item.title)
+            try {
+              // Don't specify index when creating, let Chrome handle it
+              const newBookmark = await chrome.bookmarks.create({
+                parentId,
+                title: item.title,
+                url: item.url
+              })
+              console.log('Created Chrome bookmark:', item.title)
+              
+              // Move to correct position after creation
+              if (newBookmark.index !== i && i < updatedChildren.length + 1) {
+                await chrome.bookmarks.move(newBookmark.id, {
+                  parentId,
+                  index: Math.min(i, updatedChildren.length)
+                })
+              }
+            } catch (createError) {
+              console.error('Error creating bookmark:', createError)
+            }
           } else {
             matchedIds.add(bookmarkNode.id)
-            // Update position and title if needed
+            // Update position and title if needed, with bounds checking
             if (bookmarkNode.index !== i) {
-              await chrome.bookmarks.move(bookmarkNode.id, {
-                parentId,
-                index: i
-              })
+              try {
+                const maxIndex = await chrome.bookmarks.getChildren(parentId).then(children => children.length - 1)
+                await chrome.bookmarks.move(bookmarkNode.id, {
+                  parentId,
+                  index: Math.min(i, maxIndex)
+                })
+              } catch (moveError) {
+                console.error('Error moving bookmark:', moveError)
+              }
             }
             if (bookmarkNode.title !== item.title) {
-              await chrome.bookmarks.update(bookmarkNode.id, {
-                title: item.title
-              })
+              try {
+                await chrome.bookmarks.update(bookmarkNode.id, {
+                  title: item.title
+                })
+              } catch (updateError) {
+                console.error('Error updating bookmark title:', updateError)
+              }
             }
           }
-        }
-      }
-      
-      // Remove items that no longer exist
-      for (const child of existingChildren) {
-        if (!matchedIds.has(child.id)) {
-          await chrome.bookmarks.remove(child.id)
-          console.log('Removed orphaned Chrome item:', child.title)
         }
       }
     }

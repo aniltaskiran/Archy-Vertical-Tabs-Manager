@@ -1,6 +1,6 @@
-import React, { useEffect, useRef } from 'react'
-import { Edit, Trash2, ExternalLink, Copy, FolderPlus, MoveRight } from 'lucide-react'
-import { Bookmark } from '../types'
+import React, { useEffect, useRef, useState } from 'react'
+import { Edit, Trash2, ExternalLink, Copy, FolderPlus, MoveRight, ChevronRight, Folder } from 'lucide-react'
+import { Bookmark, Folder as FolderType } from '../types'
 
 interface BookmarkContextMenuProps {
   bookmark: Bookmark
@@ -11,7 +11,8 @@ interface BookmarkContextMenuProps {
   onOpenInNewTab: (bookmark: Bookmark) => void
   onCopyUrl: (bookmark: Bookmark) => void
   onCreateFolder: () => void
-  onMoveToFolder?: (bookmark: Bookmark) => void
+  onMoveToFolder?: (bookmark: Bookmark, folder: FolderType) => void
+  availableFolders?: FolderType[]
 }
 
 export default function BookmarkContextMenu({
@@ -23,9 +24,12 @@ export default function BookmarkContextMenu({
   onOpenInNewTab,
   onCopyUrl,
   onCreateFolder,
-  onMoveToFolder
+  onMoveToFolder,
+  availableFolders = []
 }: BookmarkContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null)
+  const [showFolderSubmenu, setShowFolderSubmenu] = useState(false)
+  const [submenuPosition, setSubmenuPosition] = useState({ x: 0, y: 0 })
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -48,6 +52,22 @@ export default function BookmarkContextMenu({
       document.removeEventListener('keydown', handleEscape)
     }
   }, [onClose])
+
+  const handleMoveToFolderHover = (event: React.MouseEvent<HTMLButtonElement>) => {
+    const rect = event.currentTarget.getBoundingClientRect()
+    setSubmenuPosition({
+      x: rect.right,
+      y: rect.top
+    })
+    setShowFolderSubmenu(true)
+  }
+
+  const handleMoveToFolder = (folder: FolderType) => {
+    if (onMoveToFolder) {
+      onMoveToFolder(bookmark, folder)
+    }
+    onClose()
+  }
 
   const menuItems = [
     {
@@ -82,12 +102,19 @@ export default function BookmarkContextMenu({
         onClose()
       }
     },
-    ...(onMoveToFolder ? [{
+    ...(onMoveToFolder && availableFolders.length > 0 ? [{
       icon: MoveRight,
       label: 'Move to Folder',
-      action: () => {
-        onMoveToFolder(bookmark)
-        onClose()
+      hasSubmenu: true,
+      onHover: handleMoveToFolderHover,
+      onLeave: () => {
+        // Keep submenu open when moving to it
+        setTimeout(() => {
+          const submenu = document.querySelector('.folder-submenu')
+          if (!submenu?.matches(':hover')) {
+            setShowFolderSubmenu(false)
+          }
+        }, 100)
       }
     }] : []),
     {
@@ -102,26 +129,62 @@ export default function BookmarkContextMenu({
   ]
 
   return (
-    <div
-      ref={menuRef}
-      className="context-menu"
-      style={{
-        position: 'fixed',
-        left: position.x,
-        top: position.y,
-        zIndex: 1000
-      }}
-    >
-      {menuItems.map((item, index) => (
-        <button
-          key={index}
-          className={`context-menu-item ${item.destructive ? 'destructive' : ''}`}
-          onClick={item.action}
+    <>
+      <div
+        ref={menuRef}
+        className="context-menu"
+        style={{
+          position: 'fixed',
+          left: position.x,
+          top: position.y,
+          zIndex: 1000
+        }}
+      >
+        {menuItems.map((item, index) => (
+          <button
+            key={index}
+            className={`context-menu-item ${item.destructive ? 'destructive' : ''} ${item.hasSubmenu ? 'has-submenu' : ''}`}
+            onClick={item.action}
+            onMouseEnter={item.onHover}
+            onMouseLeave={item.onLeave}
+          >
+            <item.icon className="w-4 h-4" />
+            <span>{item.label}</span>
+            {item.hasSubmenu && <ChevronRight className="w-4 h-4 ml-auto" />}
+          </button>
+        ))}
+      </div>
+
+      {/* Folder Submenu */}
+      {showFolderSubmenu && availableFolders.length > 0 && (
+        <div
+          className="context-menu folder-submenu"
+          style={{
+            position: 'fixed',
+            left: submenuPosition.x,
+            top: submenuPosition.y,
+            zIndex: 1001
+          }}
+          onMouseLeave={() => setShowFolderSubmenu(false)}
         >
-          <item.icon className="w-4 h-4" />
-          <span>{item.label}</span>
-        </button>
-      ))}
-    </div>
+          {availableFolders.length === 0 ? (
+            <div className="context-menu-item disabled">
+              <span className="text-gray-500">No folders available</span>
+            </div>
+          ) : (
+            availableFolders.map((folder) => (
+              <button
+                key={folder.id}
+                className="context-menu-item"
+                onClick={() => handleMoveToFolder(folder)}
+              >
+                <Folder className="w-4 h-4" />
+                <span>{folder.name}</span>
+              </button>
+            ))
+          )}
+        </div>
+      )}
+    </>
   )
 }

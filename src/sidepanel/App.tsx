@@ -24,7 +24,11 @@ import {
   getArchyGroupTabs,
   syncFavoritesToTabGroup,
   getArchyGroupId,
-  reorderArchyGroupTabs
+  reorderArchyGroupTabs,
+  syncFolderToTabGroup,
+  removeFolderTabGroup,
+  renameFolderTabGroup,
+  addBookmarkToFolderTabGroup
 } from '../utils/chromeTabGroups'
 import { 
   loadSections, 
@@ -134,7 +138,7 @@ export default function App() {
         currentSections.forEach(section => {
           if (section.type === 'favorites') {
             section.items.forEach(item => {
-              if ('type' in item && item.type === 'folder') {
+              if (item && 'type' in item && item.type === 'folder') {
                 folderStates.set(item.id, item.collapsed)
               }
             })
@@ -153,7 +157,7 @@ export default function App() {
             return {
               ...section,
               items: section.items.map(item => {
-                if ('type' in item && item.type === 'folder' && folderStates.has(item.id)) {
+                if (item && 'type' in item && item.type === 'folder' && folderStates.has(item.id)) {
                   return {
                     ...item,
                     collapsed: folderStates.get(item.id)!
@@ -190,7 +194,7 @@ export default function App() {
     if (favoritesSection) {
       // Get all bookmark URLs from favorites (excluding folders)
       const favoriteBookmarks = favoritesSection.items
-        .filter(item => 'url' in item && !('type' in item && item.type === 'folder'))
+        .filter(item => item && 'url' in item && !('type' in item && item.type === 'folder'))
         .map(item => ({
           url: (item as Bookmark).url,
           title: (item as Bookmark).title
@@ -198,14 +202,18 @@ export default function App() {
       
       // Also get bookmarks from folders
       favoritesSection.items.forEach(item => {
-        if ('type' in item && item.type === 'folder') {
+        if (item && 'type' in item && item.type === 'folder') {
           const folder = item as Folder
-          folder.items.forEach(bookmark => {
-            favoriteBookmarks.push({
-              url: bookmark.url,
-              title: bookmark.title
+          if (folder.items && Array.isArray(folder.items)) {
+            folder.items.forEach(bookmark => {
+              if (bookmark && bookmark.url && bookmark.title) {
+                favoriteBookmarks.push({
+                  url: bookmark.url,
+                  title: bookmark.title
+                })
+              }
             })
-          })
+          }
         }
       })
       
@@ -225,7 +233,7 @@ export default function App() {
         // Keep existing folders and bookmarks, add new ones from tab group
         const existingUrls = new Set(
           section.items
-            .filter(item => 'url' in item)
+            .filter(item => item && 'url' in item)
             .map(item => (item as Bookmark).url)
         )
         
@@ -295,7 +303,7 @@ export default function App() {
             return {
               ...section,
               items: section.items.filter(item => 
-                !('url' in item) || item.url !== tab.url
+                !item || !('url' in item) || item.url !== tab.url
               )
             }
           }
@@ -461,7 +469,7 @@ export default function App() {
       const updatedSections = sections.map(section => ({
         ...section,
         items: section.items.map(item => 
-          'id' in item && item.id === bookmark.id 
+          item && 'id' in item && item.id === bookmark.id 
             ? { ...item, title: newTitle.trim() }
             : item
         )
@@ -494,6 +502,10 @@ export default function App() {
     setSections(updatedSections)
     await saveSections(updatedSections)
     
+    // Create tab group for the folder
+    const currentWindow = await chrome.windows.getCurrent()
+    await syncFolderToTabGroup(newFolder.name, [], currentWindow.id)
+    
     // Track the new folder ID to trigger auto-edit
     setNewFolderId(newFolder.id)
     // Clear it after a moment
@@ -511,13 +523,13 @@ export default function App() {
       if (section.type === 'favorites') {
         const updateFolderRecursively = (items: any[]): any[] => {
           return items.map(item => {
-            if ('type' in item && item.type === 'folder' && item.id === parentFolder.id) {
+            if (item && 'type' in item && item.type === 'folder' && item.id === parentFolder.id) {
               // Found the parent folder, add subfolder
               return {
                 ...item,
                 items: [...item.items, newSubfolder]
               }
-            } else if ('type' in item && item.type === 'folder') {
+            } else if (item && 'type' in item && item.type === 'folder') {
               // Recursively check nested folders
               return {
                 ...item,
@@ -563,9 +575,14 @@ export default function App() {
   }
 
   const handleFolderRename = async (folder: Folder, newName: string) => {
+    const oldName = folder.name
     const updatedSections = renameFolder(sections, folder.id, newName)
     setSections(updatedSections)
     await saveSections(updatedSections)
+    
+    // Rename the tab group
+    const currentWindow = await chrome.windows.getCurrent()
+    await renameFolderTabGroup(oldName, newName, currentWindow.id)
   }
 
   const handleDeleteFolder = async (folder: Folder) => {
@@ -573,6 +590,10 @@ export default function App() {
       const updatedSections = removeFolder(sections, folder.id)
       setSections(updatedSections)
       await saveSections(updatedSections)
+      
+      // Remove the tab group
+      const currentWindow = await chrome.windows.getCurrent()
+      await removeFolderTabGroup(folder.name, currentWindow.id)
     }
   }
 
@@ -613,19 +634,23 @@ export default function App() {
           
           // Get all bookmarks from favorites (including folders)
           updatedFavoritesSection.items.forEach(item => {
-            if ('url' in item && !('type' in item && item.type === 'folder')) {
+            if (item && 'url' in item && !('type' in item && item.type === 'folder')) {
               favoriteBookmarks.push({
                 url: (item as Bookmark).url,
                 title: (item as Bookmark).title
               })
-            } else if ('type' in item && item.type === 'folder') {
+            } else if (item && 'type' in item && item.type === 'folder') {
               const folder = item as Folder
-              folder.items.forEach(bookmark => {
-                favoriteBookmarks.push({
-                  url: bookmark.url,
-                  title: bookmark.title
+              if (folder.items && Array.isArray(folder.items)) {
+                folder.items.forEach(bookmark => {
+                  if (bookmark && bookmark.url && bookmark.title) {
+                    favoriteBookmarks.push({
+                      url: bookmark.url,
+                      title: bookmark.title
+                    })
+                  }
                 })
-              })
+              }
             }
           })
           
@@ -639,7 +664,7 @@ export default function App() {
         if (section.type === 'favorites') {
           const addToFolderRecursively = (items: any[]): any[] => {
             return items.map(item => {
-              if ('type' in item && item.type === 'folder' && item.id === folder.id) {
+              if (item && 'type' in item && item.type === 'folder' && item.id === folder.id) {
                 // Check if bookmark already exists in this folder
                 const alreadyExists = item.items.some((folderItem: any) => 
                   'url' in folderItem && folderItem.url === bookmarkToAdd.url
@@ -655,7 +680,7 @@ export default function App() {
                   ...item,
                   items: [...item.items, bookmarkToAdd]
                 }
-              } else if ('type' in item && item.type === 'folder') {
+              } else if (item && 'type' in item && item.type === 'folder') {
                 // Recursively check nested folders
                 return {
                   ...item,
@@ -691,19 +716,23 @@ export default function App() {
         
         // Get all bookmarks from favorites (including folders)
         updatedFavoritesSection.items.forEach(item => {
-          if ('url' in item && !('type' in item && item.type === 'folder')) {
+          if (item && 'url' in item && !('type' in item && item.type === 'folder')) {
             favoriteBookmarks.push({
               url: (item as Bookmark).url,
               title: (item as Bookmark).title
             })
-          } else if ('type' in item && item.type === 'folder') {
+          } else if (item && 'type' in item && item.type === 'folder') {
             const folder = item as Folder
-            folder.items.forEach(bookmark => {
-              favoriteBookmarks.push({
-                url: bookmark.url,
-                title: bookmark.title
+            if (folder.items && Array.isArray(folder.items)) {
+              folder.items.forEach(bookmark => {
+                if (bookmark && bookmark.url && bookmark.title) {
+                  favoriteBookmarks.push({
+                    url: bookmark.url,
+                    title: bookmark.title
+                  })
+                }
               })
-            })
+            }
           }
         })
         
@@ -712,13 +741,34 @@ export default function App() {
     }
   }
   
-  const handleMoveBookmarkToFolder = async (bookmark: Bookmark) => {
-    // Get available folders
+  const handleMoveBookmarkToFolder = async (bookmark: Bookmark, targetFolder?: Folder) => {
+    // If folder is provided directly (from submenu), use it
+    if (targetFolder) {
+      const updatedSections = moveBookmarkToFolder(sections, bookmark.id, targetFolder.id)
+      setSections(updatedSections)
+      await saveSections(updatedSections)
+      
+      // Sync folder's tab group
+      const currentWindow = await chrome.windows.getCurrent()
+      const folderBookmarks = targetFolder.items.filter(item => item && item.url && item.title).map(item => ({
+        url: item.url,
+        title: item.title
+      }))
+      // Add the new bookmark
+      folderBookmarks.push({
+        url: bookmark.url,
+        title: bookmark.title
+      })
+      await syncFolderToTabGroup(targetFolder.name, folderBookmarks, currentWindow.id)
+      return
+    }
+    
+    // Legacy behavior with prompt (kept for backward compatibility)
     const availableFolders: Folder[] = []
     sections.forEach(section => {
       if (section.type === 'favorites') {
         section.items.forEach(item => {
-          if ('type' in item && item.type === 'folder') {
+          if (item && 'type' in item && item.type === 'folder') {
             availableFolders.push(item)
           }
         })
@@ -734,15 +784,51 @@ export default function App() {
     const selectedFolderName = prompt(`Select folder to move bookmark to:\n\n${folderNames}\n\nEnter folder name:`)
     
     if (selectedFolderName) {
-      const targetFolder = availableFolders.find(f => f.name === selectedFolderName)
-      if (targetFolder) {
-        const updatedSections = moveBookmarkToFolder(sections, bookmark.id, targetFolder.id)
+      const folder = availableFolders.find(f => f.name === selectedFolderName)
+      if (folder) {
+        const updatedSections = moveBookmarkToFolder(sections, bookmark.id, folder.id)
         setSections(updatedSections)
         await saveSections(updatedSections)
+        
+        // Sync folder's tab group
+        const currentWindow = await chrome.windows.getCurrent()
+        const folderBookmarks = folder.items.filter(item => item && item.url && item.title).map(item => ({
+          url: item.url,
+          title: item.title
+        }))
+        folderBookmarks.push({
+          url: bookmark.url,
+          title: bookmark.title
+        })
+        await syncFolderToTabGroup(folder.name, folderBookmarks, currentWindow.id)
       } else {
         alert('Folder not found.')
       }
     }
+  }
+  
+  // Helper function to get available folders
+  const getAvailableFolders = (): Folder[] => {
+    const folders: Folder[] = []
+    sections.forEach(section => {
+      if (section.type === 'favorites') {
+        const collectFolders = (items: any[]) => {
+          items.forEach(item => {
+            if (item && 'type' in item && item.type === 'folder') {
+              folders.push(item)
+              // Also collect nested folders
+              if (item.items && Array.isArray(item.items)) {
+                collectFolders(item.items.filter(subItem => 
+                  subItem && 'type' in subItem && subItem.type === 'folder'
+                ))
+              }
+            }
+          })
+        }
+        collectFolders(section.items)
+      }
+    })
+    return folders
   }
 
   // Simple drag and drop handlers
@@ -754,13 +840,13 @@ export default function App() {
     }
     
     // Special handling for pinned tabs in Today section
-    if (dragData.sectionId === 'today' && targetSectionId === 'today' && 'windowId' in dragData.item) {
+    if (dragData.sectionId === 'today' && targetSectionId === 'today' && dragData.item && 'windowId' in dragData.item) {
       const tab = dragData.item as Tab
       const todaySection = sections.find(s => s.id === 'today')
       if (!todaySection) return
       
       const pinnedCount = todaySection.items.filter(item => 
-        'windowId' in item && item.pinned
+        item && 'windowId' in item && item.pinned
       ).length
       
       // If dragging a pinned tab below the separator, unpin it
@@ -796,7 +882,7 @@ export default function App() {
     }
     
     // Special handling for Today section (real Chrome tabs)
-    if (dragData.sectionId === 'today' && targetSectionId === 'today' && 'windowId' in dragData.item) {
+    if (dragData.sectionId === 'today' && targetSectionId === 'today' && dragData.item && 'windowId' in dragData.item) {
       const tab = dragData.item as Tab
       try {
         let newIndex = targetIndex !== undefined ? targetIndex : 0
@@ -852,7 +938,7 @@ export default function App() {
       })
       
       // Convert tab to bookmark if moving to favorites
-      if (draggedItem && targetSectionId === 'favorites' && 'windowId' in draggedItem) {
+      if (draggedItem && targetSectionId === 'favorites' && draggedItem && 'windowId' in draggedItem) {
         console.log('Converting tab to bookmark for favorites:', draggedItem)
         draggedItem = createBookmarkFromTab(draggedItem as Tab)
       }
@@ -863,7 +949,7 @@ export default function App() {
           // Check for duplicates in favorites
           if (section.type === 'favorites' && 'url' in draggedItem) {
             const exists = section.items.some(item => 
-              'url' in item && item.url === draggedItem.url
+              item && 'url' in item && item.url === draggedItem.url
             )
             if (exists) {
               console.log('Item already exists in favorites')
@@ -891,7 +977,7 @@ export default function App() {
           // Reorder tabs in Archy group based on new favorites order
           const currentWindow = await chrome.windows.getCurrent()
           const favoriteBookmarks = favoritesSection.items
-            .filter(item => 'url' in item && !('type' in item && item.type === 'folder'))
+            .filter(item => item && 'url' in item && !('type' in item && item.type === 'folder'))
             .map(item => ({
               url: (item as Bookmark).url,
               title: (item as Bookmark).title
@@ -899,14 +985,18 @@ export default function App() {
           
           // Also include bookmarks from folders
           favoritesSection.items.forEach(item => {
-            if ('type' in item && item.type === 'folder') {
+            if (item && 'type' in item && item.type === 'folder') {
               const folder = item as Folder
-              folder.items.forEach(bookmark => {
-                favoriteBookmarks.push({
-                  url: bookmark.url,
-                  title: bookmark.title
+              if (folder.items && Array.isArray(folder.items)) {
+                folder.items.forEach(bookmark => {
+                  if (bookmark && bookmark.url && bookmark.title) {
+                    favoriteBookmarks.push({
+                      url: bookmark.url,
+                      title: bookmark.title
+                    })
+                  }
                 })
-              })
+              }
             }
           })
           
@@ -1081,7 +1171,7 @@ export default function App() {
               return {
                 ...section,
                 items: section.items.map(item => {
-                  if ('windowId' in item) {
+                  if (item && 'windowId' in item) {
                     const updatedTab = allTabs.find(t => t.id === item.id)
                     if (updatedTab) {
                       return { ...item, active: updatedTab.active }
@@ -1157,8 +1247,8 @@ export default function App() {
   const filteredSections = sections.map(section => ({
     ...section,
     items: section.items.filter(item => {
-      const title = 'title' in item ? item.title : ''
-      const url = 'url' in item ? item.url : ''
+      const title = item && 'title' in item ? item.title : ''
+      const url = item && 'url' in item ? item.url : ''
       const query = searchQuery.toLowerCase()
       return title.toLowerCase().includes(query) || url.toLowerCase().includes(query)
     })
@@ -1236,7 +1326,7 @@ export default function App() {
               onDropIntoFolder={handleDropIntoFolder}
               dropProps={createDropHandlers(section.id)}
               getDragPropsForItem={(item, index) => createDragHandlers({
-                type: 'windowId' in item ? 'tab' : ('type' in item && item.type === 'folder') ? 'folder' : 'bookmark',
+                type: item && 'windowId' in item ? 'tab' : (item && 'type' in item && item.type === 'folder') ? 'folder' : 'bookmark',
                 item,
                 sectionId: section.id,
                 index
@@ -1295,6 +1385,7 @@ export default function App() {
           onCopyUrl={handleBookmarkCopyUrl}
           onCreateFolder={handleCreateFolder}
           onMoveToFolder={handleMoveBookmarkToFolder}
+          availableFolders={getAvailableFolders()}
         />
       )}
 

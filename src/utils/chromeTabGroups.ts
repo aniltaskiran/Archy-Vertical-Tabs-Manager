@@ -1,26 +1,28 @@
-// Chrome Tab Groups API integration for Archy favorites
+// Chrome Tab Groups API integration for Archy favorites and folders
 
 const ARCHY_GROUP_TITLE = 'Archy Favorites'
 const ARCHY_GROUP_COLOR: chrome.tabGroups.ColorEnum = 'blue'
+const FOLDER_GROUP_COLORS: chrome.tabGroups.ColorEnum[] = ['green', 'yellow', 'red', 'pink', 'purple', 'cyan', 'orange', 'grey']
 
-// Get or create the Archy tab group
-export async function getOrCreateArchyTabGroup(windowId: number): Promise<number> {
+// Get or create a tab group by name
+export async function getOrCreateTabGroupByName(windowId: number, groupName: string, color?: chrome.tabGroups.ColorEnum): Promise<number> {
   try {
     // Get all tab groups in the window
     const groups = await chrome.tabGroups.query({ windowId })
     
-    // Find existing Archy group
-    const archyGroup = groups.find(group => group.title === ARCHY_GROUP_TITLE)
+    // Find existing group by name
+    const existingGroup = groups.find(group => group.title === groupName)
     
-    if (archyGroup) {
-      console.log('Found existing Archy tab group:', archyGroup.id)
-      return archyGroup.id
+    if (existingGroup) {
+      console.log('Found existing tab group:', groupName, existingGroup.id)
+      return existingGroup.id
     }
     
     // Create a new tab for the group (groups need at least one tab)
     const newTab = await chrome.tabs.create({ 
       windowId,
-      active: false 
+      active: false,
+      url: 'chrome://newtab'
     })
     
     // Create new group with the tab
@@ -31,19 +33,36 @@ export async function getOrCreateArchyTabGroup(windowId: number): Promise<number
       }
     })
     
+    // Pick a color if not provided
+    const groupColor = color || FOLDER_GROUP_COLORS[Math.floor(Math.random() * FOLDER_GROUP_COLORS.length)]
+    
     // Configure the group
     await chrome.tabGroups.update(groupId, {
-      title: ARCHY_GROUP_TITLE,
-      color: ARCHY_GROUP_COLOR,
+      title: groupName,
+      color: groupColor,
       collapsed: false
     })
     
-    console.log('Created new Archy tab group:', groupId)
+    // Close the new tab page we created
+    setTimeout(async () => {
+      try {
+        await chrome.tabs.remove(newTab.id!)
+      } catch (e) {
+        // Tab might already be closed
+      }
+    }, 500)
+    
+    console.log('Created new tab group:', groupName, groupId)
     return groupId
   } catch (error) {
-    console.error('Error getting/creating Archy tab group:', error)
+    console.error('Error getting/creating tab group:', error)
     throw error
   }
+}
+
+// Get or create the Archy tab group (for backwards compatibility)
+export async function getOrCreateArchyTabGroup(windowId: number): Promise<number> {
+  return getOrCreateTabGroupByName(windowId, ARCHY_GROUP_TITLE, ARCHY_GROUP_COLOR)
 }
 
 // Add tab to Archy favorites group
@@ -303,5 +322,146 @@ export async function reorderArchyGroupTabs(favorites: Array<{url: string, title
     console.log('Reordered Archy group tabs based on favorites order')
   } catch (error) {
     console.error('Error reordering Archy group tabs:', error)
+  }
+}
+
+// Folder tab group management functions
+
+// Get or create tab group for a folder
+export async function getOrCreateFolderTabGroup(windowId: number, folderName: string): Promise<number> {
+  return getOrCreateTabGroupByName(windowId, folderName)
+}
+
+// Add bookmark to folder's tab group
+export async function addBookmarkToFolderTabGroup(
+  bookmark: { url: string; title: string },
+  folderName: string,
+  windowId: number
+): Promise<void> {
+  try {
+    // Get or create the folder's tab group
+    const groupId = await getOrCreateFolderTabGroup(windowId, folderName)
+    
+    // Check if tab already exists in the group
+    const groupTabs = await chrome.tabs.query({ groupId })
+    const existingTab = groupTabs.find(t => t.url === bookmark.url)
+    
+    if (existingTab) {
+      console.log('Tab already exists in folder group:', bookmark.url)
+      return
+    }
+    
+    // Create new tab in the group
+    const newTab = await chrome.tabs.create({
+      windowId,
+      url: bookmark.url,
+      active: false
+    })
+    
+    // Add tab to the folder's group
+    await chrome.tabs.group({
+      tabIds: [newTab.id!],
+      groupId
+    })
+    
+    console.log('Added bookmark to folder tab group:', folderName, bookmark.title)
+  } catch (error) {
+    console.error('Error adding bookmark to folder tab group:', error)
+  }
+}
+
+// Sync folder bookmarks with tab group
+export async function syncFolderToTabGroup(
+  folderName: string,
+  bookmarks: Array<{ url: string; title: string }>,
+  windowId: number
+): Promise<void> {
+  try {
+    if (bookmarks.length === 0) {
+      // If folder is empty, remove the tab group
+      await removeFolderTabGroup(folderName, windowId)
+      return
+    }
+    
+    // Get or create the folder's tab group
+    const groupId = await getOrCreateFolderTabGroup(windowId, folderName)
+    
+    // Get current tabs in the group
+    const groupTabs = await chrome.tabs.query({ groupId })
+    
+    // Create a set of desired URLs
+    const desiredUrls = new Set(bookmarks.map(b => b.url))
+    
+    // Remove tabs that shouldn't be in the group
+    for (const tab of groupTabs) {
+      if (tab.url && !desiredUrls.has(tab.url)) {
+        await chrome.tabs.remove(tab.id!)
+      }
+    }
+    
+    // Add missing tabs
+    const existingUrls = new Set(groupTabs.map(t => t.url).filter(Boolean))
+    for (const bookmark of bookmarks) {
+      if (!existingUrls.has(bookmark.url)) {
+        const newTab = await chrome.tabs.create({
+          windowId,
+          url: bookmark.url,
+          active: false
+        })
+        
+        await chrome.tabs.group({
+          tabIds: [newTab.id!],
+          groupId
+        })
+      }
+    }
+    
+    console.log('Synced folder to tab group:', folderName)
+  } catch (error) {
+    console.error('Error syncing folder to tab group:', error)
+  }
+}
+
+// Remove folder's tab group
+export async function removeFolderTabGroup(folderName: string, windowId: number): Promise<void> {
+  try {
+    const groups = await chrome.tabGroups.query({ windowId })
+    const folderGroup = groups.find(g => g.title === folderName)
+    
+    if (folderGroup) {
+      // Get all tabs in the group
+      const groupTabs = await chrome.tabs.query({ groupId: folderGroup.id })
+      
+      // Close all tabs in the group
+      const tabIds = groupTabs.map(t => t.id!).filter(id => id !== undefined)
+      if (tabIds.length > 0) {
+        await chrome.tabs.remove(tabIds)
+      }
+      
+      console.log('Removed folder tab group:', folderName)
+    }
+  } catch (error) {
+    console.error('Error removing folder tab group:', error)
+  }
+}
+
+// Rename folder's tab group
+export async function renameFolderTabGroup(
+  oldName: string,
+  newName: string,
+  windowId: number
+): Promise<void> {
+  try {
+    const groups = await chrome.tabGroups.query({ windowId })
+    const folderGroup = groups.find(g => g.title === oldName)
+    
+    if (folderGroup) {
+      await chrome.tabGroups.update(folderGroup.id, {
+        title: newName
+      })
+      console.log('Renamed folder tab group:', oldName, '->', newName)
+    }
+  } catch (error) {
+    console.error('Error renaming folder tab group:', error)
   }
 }
