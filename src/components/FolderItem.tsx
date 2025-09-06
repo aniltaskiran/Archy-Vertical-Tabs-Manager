@@ -5,6 +5,7 @@ import BookmarkItem from './BookmarkItem'
 
 interface FolderItemProps {
   folder: Folder
+  activeTabUrl?: string
   onToggleCollapse: (folderId: string) => void
   onBookmarkClick?: (bookmark: Bookmark) => void
   onBookmarkRemove?: (bookmark: Bookmark) => void
@@ -23,6 +24,7 @@ interface FolderItemProps {
 
 export default function FolderItem({
   folder,
+  activeTabUrl,
   onToggleCollapse,
   onBookmarkClick,
   onBookmarkRemove,
@@ -262,6 +264,7 @@ export default function FolderItem({
                     <BookmarkItem
                       key={`folder-bookmark-${item?.id || itemIndex}`}
                       bookmark={item as Bookmark}
+                      isActive={activeTabUrl === (item as Bookmark).url}
                       onClick={() => onBookmarkClick?.(item as Bookmark)}
                       onRemove={() => onBookmarkRemove?.(item as Bookmark)}
                       onContextMenu={onBookmarkContextMenu}

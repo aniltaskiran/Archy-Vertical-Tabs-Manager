@@ -8,6 +8,7 @@ import FolderItem from './FolderItem'
 interface SectionProps {
   section: SectionType
   isLoading?: boolean
+  activeTabUrl?: string
   onToggleCollapse: (sectionId: string) => void
   onTabClick?: (tab: Tab) => void
   onTabClose?: (tab: Tab) => void
@@ -46,6 +47,7 @@ const getSectionIcon = (type: SectionType['type']) => {
 export default function Section({ 
   section, 
   isLoading = false,
+  activeTabUrl,
   onToggleCollapse, 
   onTabClick, 
   onTabClose,
@@ -222,6 +224,7 @@ export default function Section({
                   <FolderItem
                     key={`folder-${item?.id || displayIndex}`}
                     folder={item}
+                    activeTabUrl={activeTabUrl}
                     onToggleCollapse={onFolderToggleCollapse!}
                     onBookmarkClick={onBookmarkClick}
                     onBookmarkRemove={onBookmarkRemove}
@@ -254,6 +257,7 @@ export default function Section({
                   <BookmarkItem
                     key={`bookmark-${item?.id || displayIndex}`}
                     bookmark={item}
+                    isActive={activeTabUrl === item.url}
                     onClick={() => onBookmarkClick?.(item)}
                     onRemove={() => onBookmarkRemove?.(item)}
                     onContextMenu={onBookmarkContextMenu}

@@ -4,6 +4,7 @@ import { Bookmark } from '../types'
 
 interface BookmarkItemProps {
   bookmark: Bookmark
+  isActive?: boolean
   onClick: () => void
   onRemove: () => void
   onContextMenu?: (bookmark: Bookmark, position: { x: number; y: number }) => void
@@ -14,7 +15,7 @@ interface BookmarkItemProps {
   showDropSeparator?: boolean
 }
 
-export default function BookmarkItem({ bookmark, onClick, onRemove, onContextMenu, dragProps, dropProps, showDropSeparator }: BookmarkItemProps) {
+export default function BookmarkItem({ bookmark, isActive, onClick, onRemove, onContextMenu, dragProps, dropProps, showDropSeparator }: BookmarkItemProps) {
   const handleRemoveClick = (e: React.MouseEvent) => {
     e.stopPropagation()
     onRemove()
@@ -55,7 +56,7 @@ export default function BookmarkItem({ bookmark, onClick, onRemove, onContextMen
         <div className="drop-separator active" />
       )}
       <div 
-        className="bookmark-item group"
+        className={`bookmark-item group ${isActive ? 'active' : ''}`}
         onClick={onClick}
         onContextMenu={handleContextMenu}
         {...(dragProps || {})}

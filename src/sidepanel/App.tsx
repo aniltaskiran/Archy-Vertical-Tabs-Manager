@@ -187,42 +187,9 @@ export default function App() {
     // Always load sections from storage to preserve user changes
     let sectionsData = await loadSections()
     
-    // Check if we need to initialize bookmarks from Chrome
-    const archyBookmarks = await loadFavoritesFromChrome()
-    const favoritesSection = sectionsData.find(s => s.type === 'favorites')
-    
-    if (archyBookmarks.length > 0 && favoritesSection) {
-      // We have bookmarks in Chrome, use them as the source of truth
-      console.log('Loading favorites from Chrome bookmarks')
-      sectionsData = sectionsData.map(section => {
-        if (section.type === 'favorites') {
-          return {
-            ...section,
-            items: archyBookmarks
-          }
-        }
-        return section
-      })
-      await saveSections(sectionsData)
-    } else if (favoritesSection && favoritesSection.items.length === 0) {
-      // No bookmarks in Chrome and no favorites in storage, initialize from tabs
-      console.log('Initializing bookmarks from current tabs')
-      const initialized = await initializeArchyBookmarks()
-      if (initialized) {
-        // Reload the bookmarks after initialization
-        const newBookmarks = await loadFavoritesFromChrome()
-        sectionsData = sectionsData.map(section => {
-          if (section.type === 'favorites') {
-            return {
-              ...section,
-              items: newBookmarks
-            }
-          }
-          return section
-        })
-        await saveSections(sectionsData)
-      }
-    }
+    // Don't automatically sync from Chrome bookmarks on every open
+    // This prevents UI changes when opening/closing the panel
+    // Users can still manually add bookmarks
     
     const currentWindow = await chrome.windows.getCurrent()
     
@@ -258,48 +225,39 @@ export default function App() {
       // Only open them when user explicitly clicks on them
     }
     
-    // Get tabs from Archy group
-    const archyTabs = await getArchyGroupTabs(currentWindow.id)
-    
-    // Update favorites section with tabs from Archy group
-    const updatedSections = sectionsData.map(section => {
-      if (section.type === 'favorites') {
-        // Keep existing folders and bookmarks, add new ones from tab group
-        const existingUrls = new Set(
-          section.items
-            .filter(item => item && 'url' in item)
-            .map(item => (item as Bookmark).url)
-        )
-        
-        // Add tabs from Archy group that aren't already in favorites
-        const newBookmarks = archyTabs
-          .filter(tab => tab.url && !existingUrls.has(tab.url))
-          .map(tab => ({
-            id: `bookmark-${Date.now()}-${Math.random()}`,
-            title: tab.title || 'Untitled',
-            url: tab.url!,
-            favicon: tab.favIconUrl
-          }))
-        
-        return {
-          ...section,
-          items: [...section.items, ...newBookmarks]
-        }
-      }
-      return section
-    })
-    
-    setSections(updatedSections)
-    
-    // Sync with Chrome bookmarks
-    const finalFavoritesSection = updatedSections.find(s => s.type === 'favorites')
-    if (finalFavoritesSection) {
-      await syncFavoritesWithChrome(finalFavoritesSection)
-    }
+    // Don't automatically sync tabs from Archy group - this causes UI changes
+    // Just set the sections as they are from storage
+    setSections(sectionsData)
   }
 
   const handleTabClick = async (tab: Tab) => {
     try {
+      // Immediately update all tabs to show new active state
+      setSections(prevSections => {
+        return prevSections.map(section => {
+          return {
+            ...section,
+            items: section.items.map(item => {
+              // Check if it's a tab (has windowId property)
+              if (item && typeof item === 'object' && 'windowId' in item) {
+                const tabItem = item as Tab
+                return {
+                  ...tabItem,
+                  active: tabItem.id === tab.id
+                }
+              }
+              return item
+            })
+          }
+        })
+      })
+      
+      // Also update the tabs state
+      setTabs(prevTabs => prevTabs.map(t => ({
+        ...t,
+        active: t.id === tab.id
+      })))
+      
       // Check if this is a stored pinned tab (negative ID)
       if (tab.id < 0 || !tab.windowId) {
         // This is a stored pinned tab, open it in a new tab
@@ -315,7 +273,7 @@ export default function App() {
           await chrome.tabs.create({ url: tab.url, pinned: tab.pinned })
         }
       }
-      // Reload tabs after action
+      // Reload tabs after action - but preserve the active state we just set
       setTimeout(() => loadTabs(true), 100)
     } catch (error) {
       console.error('Error switching to tab:', error)
@@ -1463,11 +1421,15 @@ export default function App() {
           // Show loading state for Today section while tabs are loading
           const isTodayLoading = section.type === 'today' && tabsLoading
           
+          // Find the active tab's URL
+          const activeTabUrl = tabs.find(tab => tab.active)?.url
+          
           return (
             <Section
               key={section.id}
               section={section}
               isLoading={isTodayLoading}
+              activeTabUrl={activeTabUrl}
               onToggleCollapse={handleSectionToggle}
               onTabClick={handleTabClick}
               onTabClose={handleTabClose}

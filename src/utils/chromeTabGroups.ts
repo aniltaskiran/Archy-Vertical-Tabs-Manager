@@ -154,7 +154,7 @@ export async function createTabInArchyGroup(url: string, title: string, windowId
     const newTab = await chrome.tabs.create({ 
       url,
       windowId,
-      active: false
+      active: true // Focus on the new tab
     })
     
     // Add to group
@@ -162,6 +162,9 @@ export async function createTabInArchyGroup(url: string, title: string, windowId
       tabIds: [newTab.id!],
       groupId
     })
+    
+    // Also focus the window
+    await chrome.windows.update(windowId, { focused: true })
     
     console.log('Created new tab in Archy group:', title)
   } catch (error) {
