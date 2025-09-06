@@ -2,21 +2,23 @@
 
 A powerful Chrome extension for managing tabs vertically with AI-powered organization, inspired by Arc browser's design.
 
-![Version](https://img.shields.io/badge/version-0.2.2-blue)
+![Version](https://img.shields.io/badge/version-0.3.0-blue)
 ![Chrome Extension](https://img.shields.io/badge/Chrome-Extension-green)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 
 ## Features
 
 ### 🎯 Core Features
+- **Welcome Experience**: Interactive welcome page with features overview and what's new on every update
+- **Smart Build Detection**: Automatic welcome page on new builds during development
 - **Dual View Modes**: Switch between vertical sidebar and overlay mode for different workflows
-- **Overlay Mode**: Omni-style centered overlay for lightning-fast tab switching (Cmd/Ctrl+Shift+Space)
+- **Overlay Mode**: Cmd+T now opens Archy overlay instead of new tab for lightning-fast tab switching
 - **Vertical Tab Layout**: Clean, space-efficient vertical tab organization in Chrome's side panel
-- **Drag & Drop**: Intuitive drag and drop to reorder tabs, organize favorites, and manage folders
+- **Enhanced Drag & Drop**: Fixed drag and drop into folders, especially for newly created folders
 - **Smart Sections**: Automatic organization into Today, Favorites, and Archive sections
 - **Folder Management**: Create folders to organize bookmarks with nested structure support
 - **Chrome Bookmarks Sync**: Automatic synchronization with Chrome bookmarks
-- **Keyboard Navigation**: Full keyboard support with arrow keys, number keys, and shortcuts
+- **Keyboard Navigation**: Full keyboard support with updated shortcuts
 
 ### 📌 Tab Management
 - **Pinned Tabs**: Special handling for pinned tabs with visual separation
@@ -61,19 +63,16 @@ npm run build
 
 ### Opening Archy
 - Click the Archy icon in Chrome's toolbar
-- Or use the keyboard shortcut: `Cmd+Shift+A` (Mac) / `Ctrl+Shift+A` (Windows/Linux)
+- Or use the keyboard shortcut: `Cmd+S` (Mac) / `Ctrl+S` (Windows/Linux)
 
 ### Keyboard Shortcuts
-- `Cmd/Ctrl + Shift + Space`: Toggle overlay mode
-- `Cmd/Ctrl + K`: Open search
-- `Cmd/Ctrl + T`: New tab
-- `Cmd/Ctrl + W`: Close current tab
+- `Cmd/Ctrl + S`: Activate Archy (open sidebar)
+- `Cmd/Ctrl + T`: Open Archy overlay (replaces new tab)
+- `Cmd/Ctrl + Shift + E`: Open Archy in new tab
+- `Cmd/Ctrl + Shift + L`: Toggle debug console
 - `↑/↓`: Navigate between tabs (in overlay mode)
 - `Enter`: Select highlighted tab (in overlay mode)
-- `Tab`: Navigate to next tab
-- `Shift + Tab`: Navigate to previous tab
-- `1-9`: Jump to tab by number
-- `Escape`: Clear search and close menus/overlay
+- `Escape`: Close overlay and clear search
 
 ### Managing Tabs
 - **Drag & Drop**: Click and drag tabs to reorder them
@@ -121,7 +120,28 @@ Archy-Vertical-Tabs-Manager/
 
 ## Release Notes
 
-### Version 0.2.2 (Current)
+### Version 0.3.0 (Current)
+#### 🎉 New Features
+- ✨ **Welcome Page**: Interactive welcome page that shows on first install, updates, and new builds
+- 🎯 **What's New Section**: Displays changelog and version history with visual timeline
+- ⌨️ **Updated Keyboard Shortcuts**: Cmd+S to activate, Cmd+T for overlay (replaces new tab)
+- 🔧 **Smart Build Detection**: Automatic welcome page during development with unique build IDs
+- 📚 **Getting Started Guide**: Step-by-step walkthrough for new users
+- 🛠️ **Settings Integration**: Easy access to welcome page via settings menu
+
+#### 🐛 Bug Fixes  
+- 🔧 **Fixed Drag & Drop**: Resolved issues with dropping items into newly created folders
+- 📁 **Folder Drop Handlers**: Fixed dragProps conflicts that prevented folder drops
+- ⚙️ **Service Worker**: Resolved registration errors and syntax issues
+- 🎯 **Build System**: Improved ES2020 compatibility for better Chrome support
+
+#### 💫 Improvements
+- 📱 **Responsive Welcome UI**: Beautiful responsive design with sidebar navigation
+- 🎨 **Visual Polish**: Enhanced hover states, transitions, and visual feedback
+- 📖 **Documentation**: Comprehensive keyboard shortcuts reference
+- 🔄 **Version Management**: Automatic version detection and update notifications
+
+### Version 0.2.2
 #### Bug Fixes
 - 🐛 Fixed issue where reactivating extension reopened all saved bookmarks
 - 📌 Bookmarks now only open when explicitly clicked by user

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { Search, Settings, Plus, Archive, Star, Bug } from 'lucide-react'
+import { Search, Settings, Plus, Archive, Star, Bug, Sparkles } from 'lucide-react'
 import SearchBar from '../components/SearchBar'
 import Section from '../components/Section'
 import ContextMenu from '../components/ContextMenu'
@@ -638,15 +638,19 @@ export default function App() {
       // Handle dropping items into folders
       const { item, type, sectionId, index } = dragData
       console.log('📌 Item type:', type, 'Section:', sectionId)
+      console.log('📌 Item details:', item)
     
     if (type === 'bookmark' || type === 'tab') {
       let bookmarkToAdd: Bookmark
       
       if (type === 'tab') {
         // Convert tab to bookmark
+        console.log('🔄 Converting tab to bookmark...')
         bookmarkToAdd = createBookmarkFromTab(item as Tab)
+        console.log('✅ Created bookmark from tab:', bookmarkToAdd)
       } else {
         // Use existing bookmark
+        console.log('📖 Using existing bookmark')
         bookmarkToAdd = item as Bookmark
       }
       
@@ -1398,6 +1402,19 @@ export default function App() {
                   {debugMode && (
                     <span className="ml-auto text-xs bg-green-600 px-2 py-0.5 rounded">ON</span>
                   )}
+                </button>
+                <button
+                  onClick={() => {
+                    chrome.tabs.create({
+                      url: chrome.runtime.getURL('src/welcome/index.html'),
+                      active: true
+                    })
+                    setShowSettingsMenu(false)
+                  }}
+                  className="w-full flex items-center gap-2 px-4 py-2 text-left hover:bg-gray-700 transition-colors text-gray-400"
+                >
+                  <Sparkles className="w-4 h-4" />
+                  <span className="text-sm">What's New</span>
                 </button>
               </div>
             )}

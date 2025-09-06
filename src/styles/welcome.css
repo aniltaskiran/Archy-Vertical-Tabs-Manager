@@ -1,0 +1,236 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  @apply bg-gray-900 text-gray-100;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.welcome-container {
+  @apply flex h-screen;
+}
+
+.welcome-sidebar {
+  @apply w-64 bg-gray-800 border-r border-gray-700 flex flex-col;
+}
+
+.welcome-logo {
+  @apply p-6 text-center border-b border-gray-700;
+}
+
+.welcome-nav {
+  @apply flex-1 p-4;
+}
+
+.nav-item {
+  @apply w-full flex items-center gap-3 px-4 py-3 rounded-lg text-gray-400 hover:text-white hover:bg-gray-700 transition-all duration-150 mb-2;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  text-align: left;
+}
+
+.nav-item.active {
+  @apply bg-blue-600 text-white hover:bg-blue-500;
+}
+
+.welcome-footer {
+  @apply p-4 border-t border-gray-700;
+}
+
+.footer-link {
+  @apply flex items-center gap-2 text-gray-400 hover:text-white transition-colors;
+  text-decoration: none;
+  font-size: 14px;
+}
+
+.welcome-content {
+  @apply flex-1 overflow-y-auto p-8;
+  max-width: 1000px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.welcome-header {
+  @apply mb-8;
+}
+
+.section-content {
+  @apply bg-gray-800 rounded-xl p-8;
+}
+
+.section-title {
+  @apply text-2xl font-bold text-white mb-6;
+}
+
+.features-grid {
+  @apply grid grid-cols-2 gap-6;
+}
+
+.feature-card {
+  @apply bg-gray-900 rounded-lg p-6 hover:bg-gray-700 transition-colors;
+}
+
+.feature-icon {
+  @apply w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center text-white mb-4;
+}
+
+.feature-title {
+  @apply text-lg font-semibold text-white mb-2;
+}
+
+.feature-description {
+  @apply text-gray-400 text-sm leading-relaxed;
+}
+
+.shortcuts-list {
+  @apply space-y-4 mb-6;
+}
+
+.shortcut-item {
+  @apply flex items-center justify-between bg-gray-900 rounded-lg px-4 py-3;
+}
+
+.shortcut-keys {
+  @apply flex items-center gap-2;
+}
+
+.key {
+  @apply px-3 py-1 bg-gray-700 text-white rounded font-mono text-sm;
+}
+
+.plus {
+  @apply text-gray-500 mx-1;
+}
+
+.shortcut-action {
+  @apply text-gray-300;
+}
+
+.tip-box {
+  @apply bg-blue-600 bg-opacity-10 border border-blue-600 border-opacity-30 rounded-lg p-4;
+}
+
+.tip-title {
+  @apply font-semibold text-blue-400 mb-1;
+}
+
+.tip-text {
+  @apply text-gray-300 text-sm;
+}
+
+.changelog {
+  @apply space-y-6;
+}
+
+.release-item {
+  @apply bg-gray-900 rounded-lg p-6;
+}
+
+.release-header {
+  @apply flex items-center gap-4 mb-4;
+}
+
+.release-version {
+  @apply text-lg font-bold text-white;
+}
+
+.release-date {
+  @apply text-sm text-gray-500;
+}
+
+.release-changes {
+  @apply space-y-2;
+  list-style: none;
+}
+
+.change-item {
+  @apply flex items-start gap-2 text-gray-300;
+}
+
+.steps-list {
+  @apply space-y-6 mb-8;
+}
+
+.step-item {
+  @apply flex gap-4;
+}
+
+.step-number {
+  @apply w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold flex-shrink-0;
+}
+
+.step-content {
+  @apply flex-1;
+}
+
+.step-title {
+  @apply text-lg font-semibold text-white mb-1;
+}
+
+.step-description {
+  @apply text-gray-400;
+}
+
+.cta-section {
+  @apply mt-8 text-center;
+}
+
+.cta-button {
+  @apply inline-flex items-center px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-lg transition-colors;
+  cursor: pointer;
+  border: none;
+}
+
+/* Scrollbar styling */
+.welcome-content::-webkit-scrollbar {
+  width: 8px;
+}
+
+.welcome-content::-webkit-scrollbar-track {
+  @apply bg-gray-800;
+}
+
+.welcome-content::-webkit-scrollbar-thumb {
+  @apply bg-gray-600 rounded-full;
+}
+
+.welcome-content::-webkit-scrollbar-thumb:hover {
+  @apply bg-gray-500;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .features-grid {
+    @apply grid-cols-1;
+  }
+  
+  .welcome-sidebar {
+    @apply w-20;
+  }
+  
+  .nav-item span,
+  .footer-link span,
+  .welcome-logo h1,
+  .welcome-logo p {
+    @apply hidden;
+  }
+  
+  .welcome-logo {
+    @apply p-4;
+  }
+  
+  .nav-item {
+    @apply justify-center px-2;
+  }
+}

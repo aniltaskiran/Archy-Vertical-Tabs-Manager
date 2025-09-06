@@ -1,12 +1,23 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { resolve } from 'path'
-import { copyFileSync, mkdirSync } from 'fs'
+import { copyFileSync, mkdirSync, writeFileSync } from 'fs'
 
-// Plugin to copy static files
+// Plugin to copy static files and generate build info
 const copyFiles = () => ({
   name: 'copy-files',
   writeBundle() {
+    // Generate build info with unique ID
+    const buildInfo = {
+      buildId: Date.now().toString(36) + Math.random().toString(36).substr(2),
+      buildTime: new Date().toISOString(),
+      timestamp: Date.now()
+    }
+    
+    // Write build info to dist
+    writeFileSync('dist/build-info.json', JSON.stringify(buildInfo, null, 2))
+    console.log('Build ID generated:', buildInfo.buildId)
+    
     // Copy manifest.json to dist
     copyFileSync('manifest.json', 'dist/manifest.json')
     // Copy icons to dist
@@ -38,6 +49,7 @@ export default defineConfig({
       input: {
         sidepanel: resolve(__dirname, 'src/sidepanel/index.html'),
         newtab: resolve(__dirname, 'src/newtab/index.html'),
+        welcome: resolve(__dirname, 'src/welcome/index.html'),
         'service-worker': resolve(__dirname, 'src/background/service-worker.ts'),
         'content': resolve(__dirname, 'src/content/content.ts'),
       },
@@ -55,7 +67,7 @@ export default defineConfig({
         assetFileNames: 'assets/[name].[ext]'
       }
     },
-    target: 'esnext',
+    target: 'es2020',
     minify: false,
     sourcemap: true
   },

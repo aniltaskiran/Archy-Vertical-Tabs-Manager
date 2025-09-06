@@ -42,6 +42,11 @@ export default function FolderItem({
   const [editName, setEditName] = useState(folder.name)
   const [isDragOver, setIsDragOver] = useState(false)
   
+  // Debug: Check if handler is present
+  React.useEffect(() => {
+    console.log(`📁 FolderItem "${folder.name}" - onDropIntoFolder exists:`, !!onDropIntoFolder)
+  }, [folder.name, onDropIntoFolder])
+  
   // Auto-focus on new folders
   React.useEffect(() => {
     if (autoEdit && folder.name === 'New Folder') {
@@ -98,6 +103,9 @@ export default function FolderItem({
       )}
       <div 
         className={`folder-item ${isDragOver ? 'drag-over' : ''}`}
+        draggable={dragProps?.draggable}
+        onDragStart={dragProps?.onDragStart}
+        onDragEnd={dragProps?.onDragEnd}
         onContextMenu={handleContextMenu}
         onDragOver={(e) => {
           // Allow drop on the entire folder
@@ -137,19 +145,19 @@ export default function FolderItem({
               if (data) {
                 const dragData = JSON.parse(data)
                 console.log('📊 Parsed drag data:', dragData)
-                console.log('🚀 Calling onDropIntoFolder...')
+                console.log('🚀 Calling onDropIntoFolder with folder:', folder, 'and dragData:', dragData)
                 onDropIntoFolder(folder, dragData)
               } else {
                 console.log('⚠️ No data in dataTransfer!')
               }
             } catch (error) {
               console.error('❌ Error handling drop into folder:', error)
+              console.error('Stack trace:', error.stack)
             }
           } else {
             console.log('⚠️ onDropIntoFolder handler not provided!')
           }
         }}
-        {...(dragProps || {})}
       >
         <div 
           className="folder-header group"
@@ -213,17 +221,24 @@ export default function FolderItem({
                 e.stopPropagation()
                 
                 // Handle drop into empty folder
+                console.log('📂 DROP on empty folder:', folder.name)
                 if (onDropIntoFolder) {
                   try {
                     const data = e.dataTransfer.getData('text/plain')
-                    console.log('Dropped into empty folder:', data)
+                    console.log('📦 Raw data from empty folder drop:', data)
                     if (data) {
                       const dragData = JSON.parse(data)
+                      console.log('📊 Parsed data for empty folder:', dragData)
                       onDropIntoFolder(folder, dragData)
+                    } else {
+                      console.log('⚠️ No data in dataTransfer for empty folder!')
                     }
                   } catch (error) {
-                    console.error('Error dropping into empty folder:', error)
+                    console.error('❌ Error dropping into empty folder:', error)
+                    console.error('Stack trace:', error.stack)
                   }
+                } else {
+                  console.log('⚠️ onDropIntoFolder not provided for empty folder!')
                 }
               }
             }}

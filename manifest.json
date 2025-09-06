@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Archy - Vertical Tabs Manager",
-  "version": "0.2.2",
+  "version": "0.3.0",
   "description": "AI-powered vertical tabs manager for organized and efficient browsing",
   "permissions": [
     "tabs",
@@ -52,10 +52,10 @@
   "commands": {
     "_execute_action": {
       "suggested_key": {
-        "default": "Ctrl+E",
-        "mac": "Command+E"
+        "default": "Ctrl+S",
+        "mac": "Command+S"
       },
-      "description": "Toggle Archy side panel"
+      "description": "Activate Archy"
     },
     "open-archy-tab": {
       "suggested_key": {
@@ -66,10 +66,10 @@
     },
     "open-archy-overlay": {
       "suggested_key": {
-        "default": "Ctrl+Shift+K",
-        "mac": "Command+Shift+K"
+        "default": "Ctrl+T",
+        "mac": "Command+T"
       },
-      "description": "Open Archy overlay"
+      "description": "Open Archy overlay (New Tab)"
     },
     "toggle-debug-console": {
       "suggested_key": {

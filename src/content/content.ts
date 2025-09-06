@@ -65,6 +65,16 @@ console.info = (...args: any[]) => {
 
 // Track keyboard navigation
 document.addEventListener('keydown', (e) => {
+  // Check for Cmd+T to open overlay (new tab shortcut)
+  if ((e.metaKey || e.ctrlKey) && e.key === 't') {
+    e.preventDefault()
+    e.stopPropagation()
+    if (!isOpen) {
+      openOverlay()
+    }
+    return
+  }
+  
   // Check for Cmd+Shift+L to toggle debug console (only if debug mode is enabled)
   if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'L') {
     if (debugModeEnabled) {
@@ -93,7 +103,7 @@ document.addEventListener('keydown', (e) => {
       selectCurrentTab()
       break
   }
-})
+}, true) // Use capture phase to intercept before other handlers
 
 // Initialize overlay when DOM is ready
 if (document.readyState === 'loading') {

@@ -71,9 +71,84 @@ console.info = (...args: any[]) => {
   setTimeout(() => forwardLog('info', args), 0)
 }
 
-chrome.runtime.onInstalled.addListener(() => {
-  console.log('Archy extension installed')
-})
+chrome.runtime.onInstalled.addListener(async (details) => {
+  console.log('Archy extension installed/updated', details)
+  
+  // Open welcome page on install or update
+  if (details.reason === 'install') {
+    // New installation
+    chrome.tabs.create({
+      url: chrome.runtime.getURL('src/welcome/index.html'),
+      active: true
+    })
+  } else if (details.reason === 'update') {
+    // Extension updated
+    const currentVersion = chrome.runtime.getManifest().version
+    const previousVersion = details.previousVersion
+    
+    // Only show welcome page for significant updates
+    if (previousVersion && previousVersion !== currentVersion) {
+      chrome.tabs.create({
+        url: chrome.runtime.getURL('src/welcome/index.html'),
+        active: true
+      })
+    }
+  }
+});
+
+// Check build ID on startup (for development reloads)
+// This runs immediately when service worker starts
+(async () => {
+  // Small delay to ensure everything is initialized
+  await new Promise(resolve => setTimeout(resolve, 500))
+  
+  try {
+    // Fetch current build info
+    const response = await fetch(chrome.runtime.getURL('build-info.json'))
+    const buildInfo = await response.json()
+    const currentBuildId = buildInfo.buildId
+    
+    console.log('Current Build ID:', currentBuildId)
+    
+    // Check stored build ID
+    const result = await chrome.storage.local.get(['lastBuildId', 'previousVersion'])
+    const lastBuildId = result.lastBuildId
+    const currentVersion = chrome.runtime.getManifest().version
+    
+    // Show welcome page if build ID changed or no previous version
+    if (currentBuildId !== lastBuildId || !result.previousVersion) {
+      console.log('New build detected or first run, showing welcome page')
+      console.log('Last Build ID:', lastBuildId, 'Current Build ID:', currentBuildId)
+      
+      chrome.tabs.create({
+        url: chrome.runtime.getURL('src/welcome/index.html'),
+        active: true
+      })
+      
+      // Save current build ID and version
+      await chrome.storage.local.set({ 
+        lastBuildId: currentBuildId,
+        previousVersion: currentVersion 
+      })
+    } else {
+      console.log('Same build, not showing welcome page')
+    }
+  } catch (error) {
+    console.error('Error checking build ID:', error)
+    // Fallback to version check
+    const result = await chrome.storage.local.get(['previousVersion'])
+    const currentVersion = chrome.runtime.getManifest().version
+    
+    if (!result.previousVersion) {
+      console.log('No previous version found (fallback), showing welcome page')
+      chrome.tabs.create({
+        url: chrome.runtime.getURL('src/welcome/index.html'),
+        active: true
+      })
+      await chrome.storage.local.set({ previousVersion: currentVersion })
+    }
+  }
+})();
 
 // Handle keyboard shortcuts
 chrome.commands.onCommand.addListener((command) => {
@@ -184,6 +259,18 @@ chrome.windows.onFocusChanged.addListener((windowId) => {
 
 // Handle messages from the side panel and content script
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  // Handle open sidebar request from welcome page
+  if (message.type === 'OPEN_SIDEBAR') {
+    chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
+      if (tabs[0]?.id && tabs[0]?.windowId) {
+        // Open the side panel
+        await chrome.sidePanel.open({ windowId: tabs[0].windowId })
+      }
+    })
+    sendResponse({ success: true })
+    return true
+  }
+  
   // Forward logs from side panel to content scripts
   if (message.type === 'FORWARD_LOG') {
     forwardLog(message.level, message.args)
