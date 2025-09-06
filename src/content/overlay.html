@@ -1,4 +1,22 @@
 <div id="archy-overlay-backdrop">
+  <!-- Debug Console -->
+  <div id="archy-debug-console" style="display: none;">
+    <div id="archy-debug-header">
+      <div class="archy-debug-title">
+        <span class="archy-debug-icon">🐛</span>
+        <span>Debug Console</span>
+        <span id="archy-debug-count">(0)</span>
+      </div>
+      <div class="archy-debug-controls">
+        <button id="archy-debug-test" title="Test Log">🧪</button>
+        <button id="archy-debug-clear" title="Clear">🗑️</button>
+        <button id="archy-debug-copy" title="Copy All">📋</button>
+        <button id="archy-debug-minimize" title="Minimize">_</button>
+      </div>
+    </div>
+    <div id="archy-debug-logs"></div>
+  </div>
+  
   <div id="archy-overlay">
     <div id="archy-overlay-header">
       <div id="archy-overlay-brand">

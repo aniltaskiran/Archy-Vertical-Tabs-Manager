@@ -101,6 +101,9 @@ export default function FolderItem({
           // Allow drop on the entire folder
           e.preventDefault()
           e.stopPropagation()
+          if (!isDragOver) {
+            console.log('🔥 DRAG OVER on folder:', folder.name)
+          }
           setIsDragOver(true)
           e.dataTransfer.dropEffect = 'copy'
         }}
@@ -118,22 +121,30 @@ export default function FolderItem({
           }
         }}
         onDrop={(e) => {
+          console.log('🎯 DROP EVENT on FolderItem:', folder.name)
           e.preventDefault()
           e.stopPropagation()
           setIsDragOver(false)
           
           // Handle drop into folder
+          console.log('📂 onDropIntoFolder exists?', !!onDropIntoFolder)
           if (onDropIntoFolder) {
             try {
               const data = e.dataTransfer.getData('text/plain')
-              console.log('Dropped data into folder:', data)
+              console.log('📦 Raw dropped data:', data)
               if (data) {
                 const dragData = JSON.parse(data)
+                console.log('📊 Parsed drag data:', dragData)
+                console.log('🚀 Calling onDropIntoFolder...')
                 onDropIntoFolder(folder, dragData)
+              } else {
+                console.log('⚠️ No data in dataTransfer!')
               }
             } catch (error) {
-              console.error('Error handling drop into folder:', error)
+              console.error('❌ Error handling drop into folder:', error)
             }
+          } else {
+            console.log('⚠️ onDropIntoFolder handler not provided!')
           }
         }}
         {...(dragProps || {})}

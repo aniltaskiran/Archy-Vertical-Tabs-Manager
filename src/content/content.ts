@@ -3,9 +3,77 @@ let isOpen = false
 let overlayContainer: HTMLElement | null = null
 let selectedIndex = 0
 let visibleTabs: HTMLElement[] = []
+let debugLogs: Array<{time: string, level: string, msg: string}> = []
+let debugConsoleOpen = false
+let debugMinimized = false
+let debugModeEnabled = false
+
+// Load debug mode state
+chrome.storage.local.get('debugMode', (result) => {
+  debugModeEnabled = result.debugMode || false
+  console.log('🔧 Debug mode loaded:', debugModeEnabled)
+})
+
+// Override console methods to capture logs
+const originalLog = console.log
+const originalWarn = console.warn
+const originalError = console.error
+const originalInfo = console.info
+
+function captureLog(level: string, args: any[]) {
+  if (!debugModeEnabled) return // Don't capture logs if debug mode is disabled
+  
+  const time = new Date().toLocaleTimeString()
+  const msg = args.map(arg => {
+    if (typeof arg === 'object') {
+      try {
+        return JSON.stringify(arg, null, 2)
+      } catch {
+        return String(arg)
+      }
+    }
+    return String(arg)
+  }).join(' ')
+  
+  debugLogs.unshift({ time, level, msg })
+  if (debugLogs.length > 100) debugLogs = debugLogs.slice(0, 100)
+  
+  if (debugConsoleOpen) {
+    updateDebugConsole()
+  }
+}
+
+console.log = (...args: any[]) => {
+  originalLog.apply(console, args)
+  captureLog('log', args)
+}
+
+console.warn = (...args: any[]) => {
+  originalWarn.apply(console, args)
+  captureLog('warn', args)
+}
+
+console.error = (...args: any[]) => {
+  originalError.apply(console, args)
+  captureLog('error', args)
+}
+
+console.info = (...args: any[]) => {
+  originalInfo.apply(console, args)
+  captureLog('info', args)
+}
 
 // Track keyboard navigation
 document.addEventListener('keydown', (e) => {
+  // Check for Cmd+Shift+L to toggle debug console (only if debug mode is enabled)
+  if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'L') {
+    if (debugModeEnabled) {
+      e.preventDefault()
+      toggleDebugConsole()
+    }
+    return
+  }
+  
   if (!isOpen) return
   
   switch(e.key) {
@@ -70,6 +138,108 @@ function setupOverlayEvents() {
   const searchInput = document.querySelector('#archy-search-input') as HTMLInputElement
   if (searchInput) {
     searchInput.addEventListener('input', handleSearch)
+  }
+  
+  // Debug console controls
+  setupDebugControls()
+}
+
+function setupDebugControls() {
+  const testBtn = document.querySelector('#archy-debug-test')
+  const clearBtn = document.querySelector('#archy-debug-clear')
+  const copyBtn = document.querySelector('#archy-debug-copy')
+  const minimizeBtn = document.querySelector('#archy-debug-minimize')
+  
+  if (testBtn) {
+    testBtn.addEventListener('click', () => {
+      console.log('🧪 Test log from overlay')
+      console.info('ℹ️ Info message test')
+      console.warn('⚠️ Warning message test')
+      console.error('❌ Error message test')
+      console.log('Debug mode enabled:', debugModeEnabled)
+      console.log('Debug console open:', debugConsoleOpen)
+      console.log('Total logs captured:', debugLogs.length)
+    })
+  }
+  
+  if (clearBtn) {
+    clearBtn.addEventListener('click', () => {
+      debugLogs = []
+      updateDebugConsole()
+    })
+  }
+  
+  if (copyBtn) {
+    copyBtn.addEventListener('click', () => {
+      const logText = debugLogs.map(log => 
+        `[${log.time}] ${log.level.toUpperCase()}: ${log.msg}`
+      ).join('\n')
+      navigator.clipboard.writeText(logText)
+    })
+  }
+  
+  if (minimizeBtn) {
+    minimizeBtn.addEventListener('click', () => {
+      debugMinimized = !debugMinimized
+      const debugConsole = document.querySelector('#archy-debug-console') as HTMLElement
+      if (debugConsole) {
+        if (debugMinimized) {
+          debugConsole.classList.add('minimized')
+        } else {
+          debugConsole.classList.remove('minimized')
+        }
+      }
+    })
+  }
+}
+
+function toggleDebugConsole() {
+  if (!debugModeEnabled) {
+    console.log('⚠️ Debug mode is disabled')
+    return // Don't allow toggling if debug mode is disabled
+  }
+  
+  debugConsoleOpen = !debugConsoleOpen
+  console.log('🔄 Toggling debug console:', debugConsoleOpen)
+  
+  const debugConsole = document.querySelector('#archy-debug-console') as HTMLElement
+  
+  if (debugConsole) {
+    if (debugConsoleOpen) {
+      debugConsole.style.display = 'flex'
+      updateDebugConsole()
+      console.log('✅ Debug console opened')
+    } else {
+      debugConsole.style.display = 'none'
+      console.log('❌ Debug console closed')
+    }
+  } else {
+    console.error('Debug console element not found!')
+  }
+}
+
+function updateDebugConsole() {
+  const logsContainer = document.querySelector('#archy-debug-logs')
+  const countElement = document.querySelector('#archy-debug-count')
+  
+  if (countElement) {
+    countElement.textContent = `(${debugLogs.length})`
+  }
+  
+  if (logsContainer) {
+    logsContainer.innerHTML = debugLogs.map(log => {
+      const levelIcon = log.level === 'error' ? '❌' : 
+                       log.level === 'warn' ? '⚠️' :
+                       log.level === 'info' ? 'ℹ️' : '📝'
+      
+      return `
+        <div class="archy-debug-log ${log.level}">
+          <span class="archy-debug-log-time">${log.time}</span>
+          <span class="archy-debug-log-level">${levelIcon}</span>
+          <span class="archy-debug-log-msg">${log.msg}</span>
+        </div>
+      `
+    }).join('')
   }
 }
 
@@ -245,6 +415,38 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       closeOverlay()
     } else {
       openOverlay()
+    }
+  } else if (message.type === 'DEBUG_LOG') {
+    // Handle debug logs from other parts of the extension (only if debug mode is enabled)
+    if (!debugModeEnabled) {
+      console.log('Skipping debug log - debug mode disabled')
+      return
+    }
+    
+    const time = new Date().toLocaleTimeString()
+    const msg = message.args.join(' ')
+    
+    console.log('📨 Received debug log from background:', message.level, msg)
+    
+    debugLogs.unshift({ time, level: message.level, msg })
+    if (debugLogs.length > 100) debugLogs = debugLogs.slice(0, 100)
+    
+    if (debugConsoleOpen) {
+      updateDebugConsole()
+    }
+  } else if (message.type === 'DEBUG_MODE_CHANGED') {
+    // Update debug mode state
+    debugModeEnabled = message.enabled
+    
+    // If debug mode is disabled, close and hide the debug console
+    if (!debugModeEnabled) {
+      debugConsoleOpen = false
+      const debugConsole = document.querySelector('#archy-debug-console') as HTMLElement
+      if (debugConsole) {
+        debugConsole.style.display = 'none'
+      }
+      // Clear logs when debug mode is disabled
+      debugLogs = []
     }
   }
 })

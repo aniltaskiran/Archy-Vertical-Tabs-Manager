@@ -20,6 +20,7 @@ export function useSimpleDragDrop({ onMove }: UseSimpleDragDropProps) {
   } | null>(null)
 
   const handleDragStart = (data: DragData) => {
+    console.log('🎬 DRAG START - Hook level:', data)
     setDragData(data)
   }
 
@@ -29,8 +30,15 @@ export function useSimpleDragDrop({ onMove }: UseSimpleDragDropProps) {
   }
 
   const handleDrop = (targetSectionId: string, targetIndex?: number) => {
+    console.log('💧 DROP - Hook level')
+    console.log('  Target section:', targetSectionId)
+    console.log('  Target index:', targetIndex)
+    console.log('  Drag data:', dragData)
     if (dragData) {
+      console.log('  Calling onMove...')
       onMove(dragData, targetSectionId, targetIndex)
+    } else {
+      console.log('  ⚠️ No drag data available!')
     }
     setDragData(null)
     setDropIndicator(null)
@@ -45,6 +53,8 @@ export function useSimpleDragDrop({ onMove }: UseSimpleDragDropProps) {
   const createDragHandlers = (data: DragData) => ({
     draggable: true,
     onDragStart: (e: React.DragEvent) => {
+      console.log('🎯 onDragStart event triggered')
+      console.log('  Data:', data)
       e.stopPropagation()
       handleDragStart(data)
       // Visual feedback
@@ -72,6 +82,8 @@ export function useSimpleDragDrop({ onMove }: UseSimpleDragDropProps) {
       handleDragOver(sectionId, index)
     },
     onDrop: (e: React.DragEvent) => {
+      console.log('📍 onDrop event triggered')
+      console.log('  Section:', sectionId, 'Index:', index)
       e.preventDefault()
       e.stopPropagation()
       handleDrop(sectionId, index)

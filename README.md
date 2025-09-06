@@ -2,7 +2,7 @@
 
 A powerful Chrome extension for managing tabs vertically with AI-powered organization, inspired by Arc browser's design.
 
-![Version](https://img.shields.io/badge/version-0.2.1-blue)
+![Version](https://img.shields.io/badge/version-0.2.2-blue)
 ![Chrome Extension](https://img.shields.io/badge/Chrome-Extension-green)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 
@@ -121,7 +121,13 @@ Archy-Vertical-Tabs-Manager/
 
 ## Release Notes
 
-### Version 0.2.1 (Current)
+### Version 0.2.2 (Current)
+#### Bug Fixes
+- 🐛 Fixed issue where reactivating extension reopened all saved bookmarks
+- 📌 Bookmarks now only open when explicitly clicked by user
+- 🔧 Improved extension activation behavior
+
+### Version 0.2.1
 #### New Features
 - ✨ Enhanced keyboard navigation for overlay mode
 - ⌨️ Arrow keys (↑/↓) to navigate between tabs

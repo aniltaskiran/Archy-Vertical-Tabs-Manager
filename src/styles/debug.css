@@ -1,0 +1,262 @@
+/* Debug Panel Styles - Overlay Mode */
+.debug-panel {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  right: 10px;
+  background: rgba(15, 23, 42, 0.98);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  border-radius: 12px;
+  z-index: 9999;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  max-height: 60vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.7), 
+              0 0 0 1px rgba(59, 130, 246, 0.1) inset,
+              0 0 80px rgba(59, 130, 246, 0.15);
+  animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.debug-panel.dragging {
+  transition: none;
+  user-select: none;
+  cursor: move;
+}
+
+.debug-panel.dragging * {
+  cursor: move !important;
+}
+
+.debug-panel.minimized {
+  max-height: 42px;
+  animation: none;
+}
+
+.debug-panel.minimized .debug-header {
+  border-bottom: none;
+}
+
+.debug-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: rgba(0, 0, 0, 0.3);
+  border-bottom: 1px solid rgba(59, 130, 246, 0.15);
+  flex-shrink: 0;
+  border-radius: 12px 12px 0 0;
+  cursor: move;
+}
+
+.debug-content {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.debug-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.debug-logs {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 11px;
+  line-height: 1.5;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 0 0 12px 12px;
+}
+
+.debug-log-entry {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 6px 10px;
+  margin-bottom: 2px;
+  border-radius: 6px;
+  transition: all 0.15s;
+  position: relative;
+  word-break: break-word;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.debug-log-entry:hover {
+  background: rgba(59, 130, 246, 0.08);
+  transform: translateX(2px);
+}
+
+.debug-log-time {
+  color: #6b7280;
+  font-size: 10px;
+  flex-shrink: 0;
+  min-width: 65px;
+}
+
+.debug-log-icon {
+  flex-shrink: 0;
+  width: 16px;
+  text-align: center;
+}
+
+.debug-log-message {
+  flex: 1;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+.debug-copy-btn {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  padding: 2px;
+  background: rgba(59, 130, 246, 0.1);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  border-radius: 3px;
+  color: #9ca3af;
+  transition: all 0.1s;
+  cursor: pointer;
+}
+
+.debug-copy-btn:hover {
+  background: rgba(59, 130, 246, 0.2);
+  color: #3b82f6;
+}
+
+.debug-filter-btn {
+  padding: 2px 6px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  color: #6b7280;
+  font-size: 11px;
+  transition: all 0.1s;
+  cursor: pointer;
+}
+
+.debug-filter-btn:hover {
+  background: rgba(59, 130, 246, 0.1);
+  border-color: rgba(59, 130, 246, 0.2);
+  color: #9ca3af;
+}
+
+.debug-filter-btn.active {
+  background: rgba(59, 130, 246, 0.2);
+  border-color: rgba(59, 130, 246, 0.4);
+  color: #3b82f6;
+}
+
+.debug-action-btn {
+  padding: 4px;
+  background: transparent;
+  border: none;
+  border-radius: 3px;
+  color: #6b7280;
+  transition: all 0.1s;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.debug-action-btn:hover {
+  background: rgba(59, 130, 246, 0.1);
+  color: #9ca3af;
+}
+
+/* Scrollbar styling for debug logs */
+.debug-logs::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.debug-logs::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.debug-logs::-webkit-scrollbar-thumb {
+  background: rgba(59, 130, 246, 0.3);
+  border-radius: 3px;
+}
+
+.debug-logs::-webkit-scrollbar-thumb:hover {
+  background: rgba(59, 130, 246, 0.5);
+}
+
+/* Settings Toggle for Debug Mode */
+.debug-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: rgba(59, 130, 246, 0.05);
+  border: 1px solid rgba(59, 130, 246, 0.1);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.debug-toggle:hover {
+  background: rgba(59, 130, 246, 0.1);
+  border-color: rgba(59, 130, 246, 0.2);
+}
+
+.debug-toggle.active {
+  background: rgba(59, 130, 246, 0.2);
+  border-color: rgba(59, 130, 246, 0.4);
+}
+
+.debug-toggle-label {
+  color: #9ca3af;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.debug-toggle-switch {
+  width: 32px;
+  height: 18px;
+  background: #374151;
+  border-radius: 9px;
+  position: relative;
+  transition: background 0.2s;
+}
+
+.debug-toggle.active .debug-toggle-switch {
+  background: #3b82f6;
+}
+
+.debug-toggle-switch::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  background: white;
+  border-radius: 50%;
+  transition: transform 0.2s;
+}
+
+.debug-toggle.active .debug-toggle-switch::after {
+  transform: translateX(14px);
+}

@@ -1,5 +1,139 @@
 /* Archy Overlay Styles */
 
+/* Debug Console Styles */
+#archy-debug-console {
+  position: fixed !important;
+  top: 10px !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  width: 90% !important;
+  max-width: 800px !important;
+  max-height: 300px !important;
+  background: rgba(15, 23, 42, 0.98) !important;
+  border: 1px solid rgba(59, 130, 246, 0.3) !important;
+  border-radius: 12px !important;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5) !important;
+  z-index: 2147483648 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  backdrop-filter: blur(10px) !important;
+  animation: archySlideDown 0.3s ease-out !important;
+}
+
+#archy-debug-console.minimized {
+  max-height: 40px !important;
+}
+
+#archy-debug-header {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  padding: 10px 15px !important;
+  background: rgba(0, 0, 0, 0.3) !important;
+  border-bottom: 1px solid rgba(59, 130, 246, 0.2) !important;
+  border-radius: 12px 12px 0 0 !important;
+}
+
+.archy-debug-title {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  color: #fff !important;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+}
+
+.archy-debug-icon {
+  font-size: 16px !important;
+}
+
+#archy-debug-count {
+  color: #94a3b8 !important;
+  font-size: 12px !important;
+}
+
+.archy-debug-controls {
+  display: flex !important;
+  gap: 8px !important;
+}
+
+.archy-debug-controls button {
+  background: transparent !important;
+  border: none !important;
+  color: #94a3b8 !important;
+  cursor: pointer !important;
+  padding: 4px 8px !important;
+  border-radius: 4px !important;
+  font-size: 14px !important;
+  transition: all 0.2s !important;
+}
+
+.archy-debug-controls button:hover {
+  background: rgba(59, 130, 246, 0.2) !important;
+  color: #fff !important;
+}
+
+#archy-debug-logs {
+  flex: 1 !important;
+  overflow-y: auto !important;
+  padding: 10px !important;
+  font-family: 'Monaco', 'Menlo', monospace !important;
+  font-size: 11px !important;
+  line-height: 1.4 !important;
+}
+
+.archy-debug-log {
+  display: flex !important;
+  gap: 8px !important;
+  padding: 4px 8px !important;
+  margin-bottom: 2px !important;
+  border-radius: 4px !important;
+  background: rgba(0, 0, 0, 0.2) !important;
+  word-break: break-word !important;
+}
+
+.archy-debug-log:hover {
+  background: rgba(59, 130, 246, 0.1) !important;
+}
+
+.archy-debug-log-time {
+  color: #64748b !important;
+  min-width: 60px !important;
+}
+
+.archy-debug-log-level {
+  min-width: 16px !important;
+  text-align: center !important;
+}
+
+.archy-debug-log-msg {
+  flex: 1 !important;
+  color: #e2e8f0 !important;
+}
+
+.archy-debug-log.error .archy-debug-log-msg {
+  color: #f87171 !important;
+}
+
+.archy-debug-log.warn .archy-debug-log-msg {
+  color: #fbbf24 !important;
+}
+
+.archy-debug-log.info .archy-debug-log-msg {
+  color: #60a5fa !important;
+}
+
+@keyframes archySlideDown {
+  from { 
+    opacity: 0;
+    transform: translateX(-50%) translateY(-20px);
+  }
+  to { 
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
 #archy-overlay-container {
   display: none;
   position: fixed !important;

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { Search, Settings, Plus, Archive, Star } from 'lucide-react'
+import { Search, Settings, Plus, Archive, Star, Bug } from 'lucide-react'
 import SearchBar from '../components/SearchBar'
 import Section from '../components/Section'
 import ContextMenu from '../components/ContextMenu'
@@ -15,7 +15,9 @@ import {
   syncFavoritesWithChrome,
   loadFavoritesFromChrome,
   createChromeFolder,
-  addBookmarkToFolder
+  addBookmarkToFolder,
+  initializeArchyBookmarks,
+  backupFavorites
 } from '../utils/chromeBookmarks'
 import {
   addTabToArchyGroup,
@@ -73,14 +75,12 @@ export default function App() {
     position: { x: number; y: number }
   } | null>(null)
   const [newFolderId, setNewFolderId] = useState<string | null>(null)
-  // Debug logging disabled
-  const debugLogs: string[] = []
-  const addDebugLog = (_message: string) => {
-    // Debug logging disabled
-  }
+  const [showSettingsMenu, setShowSettingsMenu] = useState(false)
+  const [debugMode, setDebugMode] = useState(false)
 
   const loadTabs = async (preserveState: boolean = true) => {
     try {
+      console.log('🔄 Loading tabs...', { preserveState })
       setTabsLoading(true)
       const chromeWindows = await chrome.windows.getAll({ populate: true })
       const processedWindows: ChromeWindow[] = []
@@ -185,15 +185,52 @@ export default function App() {
 
   const loadAppData = async () => {
     // Always load sections from storage to preserve user changes
-    const sectionsData = await loadSections()
+    let sectionsData = await loadSections()
+    
+    // Check if we need to initialize bookmarks from Chrome
+    const archyBookmarks = await loadFavoritesFromChrome()
+    const favoritesSection = sectionsData.find(s => s.type === 'favorites')
+    
+    if (archyBookmarks.length > 0 && favoritesSection) {
+      // We have bookmarks in Chrome, use them as the source of truth
+      console.log('Loading favorites from Chrome bookmarks')
+      sectionsData = sectionsData.map(section => {
+        if (section.type === 'favorites') {
+          return {
+            ...section,
+            items: archyBookmarks
+          }
+        }
+        return section
+      })
+      await saveSections(sectionsData)
+    } else if (favoritesSection && favoritesSection.items.length === 0) {
+      // No bookmarks in Chrome and no favorites in storage, initialize from tabs
+      console.log('Initializing bookmarks from current tabs')
+      const initialized = await initializeArchyBookmarks()
+      if (initialized) {
+        // Reload the bookmarks after initialization
+        const newBookmarks = await loadFavoritesFromChrome()
+        sectionsData = sectionsData.map(section => {
+          if (section.type === 'favorites') {
+            return {
+              ...section,
+              items: newBookmarks
+            }
+          }
+          return section
+        })
+        await saveSections(sectionsData)
+      }
+    }
     
     const currentWindow = await chrome.windows.getCurrent()
     
     // First, sync existing favorites to Chrome tab group
-    const favoritesSection = sectionsData.find(s => s.type === 'favorites')
-    if (favoritesSection) {
+    const updatedFavoritesSection = sectionsData.find(s => s.type === 'favorites')
+    if (updatedFavoritesSection) {
       // Get all bookmark URLs from favorites (excluding folders)
-      const favoriteBookmarks = favoritesSection.items
+      const favoriteBookmarks = updatedFavoritesSection.items
         .filter(item => item && 'url' in item && !('type' in item && item.type === 'folder'))
         .map(item => ({
           url: (item as Bookmark).url,
@@ -201,7 +238,7 @@ export default function App() {
         }))
       
       // Also get bookmarks from folders
-      favoritesSection.items.forEach(item => {
+      updatedFavoritesSection.items.forEach(item => {
         if (item && 'type' in item && item.type === 'folder') {
           const folder = item as Folder
           if (folder.items && Array.isArray(folder.items)) {
@@ -217,11 +254,8 @@ export default function App() {
         }
       })
       
-      // Open all favorites as tabs in the Archy group
-      if (favoriteBookmarks.length > 0) {
-        console.log('Syncing favorites to Chrome tab group:', favoriteBookmarks)
-        await syncFavoritesToTabGroup(favoriteBookmarks, currentWindow.id)
-      }
+      // Don't automatically open favorites when extension loads
+      // Only open them when user explicitly clicks on them
     }
     
     // Get tabs from Archy group
@@ -258,9 +292,9 @@ export default function App() {
     setSections(updatedSections)
     
     // Sync with Chrome bookmarks
-    const updatedFavoritesSection = updatedSections.find(s => s.type === 'favorites')
-    if (updatedFavoritesSection) {
-      await syncFavoritesWithChrome(updatedFavoritesSection)
+    const finalFavoritesSection = updatedSections.find(s => s.type === 'favorites')
+    if (finalFavoritesSection) {
+      await syncFavoritesWithChrome(finalFavoritesSection)
     }
   }
 
@@ -383,6 +417,13 @@ export default function App() {
       setSections(updatedSections)
       await saveSections(updatedSections)
       
+      // Sync with Chrome bookmarks
+      const favoritesSection = updatedSections.find(s => s.type === 'favorites')
+      if (favoritesSection) {
+        await syncFavoritesWithChrome(favoritesSection)
+        await backupFavorites(favoritesSection)
+      }
+      
       console.log('Added tab to Archy group and saved to storage')
       
       // Reload tabs to remove from Today section (since it's now in Archy group)
@@ -419,8 +460,12 @@ export default function App() {
     setSections(updatedSections)
     await saveSections(updatedSections)
     
-    // Remove from Chrome bookmarks
-    await removeChromeBookmark(bookmark.url)
+    // Sync with Chrome bookmarks
+    const favoritesSection = updatedSections.find(s => s.type === 'favorites')
+    if (favoritesSection) {
+      await syncFavoritesWithChrome(favoritesSection)
+      await backupFavorites(favoritesSection)
+    }
   }
 
   const handleArchiveTab = async (tab: Tab) => {
@@ -502,6 +547,13 @@ export default function App() {
     setSections(updatedSections)
     await saveSections(updatedSections)
     
+    // Sync with Chrome bookmarks
+    const favoritesSection = updatedSections.find(s => s.type === 'favorites')
+    if (favoritesSection) {
+      await syncFavoritesWithChrome(favoritesSection)
+      await backupFavorites(favoritesSection)
+    }
+    
     // Create tab group for the folder
     const currentWindow = await chrome.windows.getCurrent()
     await syncFolderToTabGroup(newFolder.name, [], currentWindow.id)
@@ -551,6 +603,13 @@ export default function App() {
     setSections(updatedSections)
     await saveSections(updatedSections)
     
+    // Sync with Chrome bookmarks
+    const favoritesSection = updatedSections.find(s => s.type === 'favorites')
+    if (favoritesSection) {
+      await syncFavoritesWithChrome(favoritesSection)
+      await backupFavorites(favoritesSection)
+    }
+    
     // Track the new folder ID to trigger auto-edit
     setNewFolderId(newSubfolder.id)
     setTimeout(() => setNewFolderId(null), 100)
@@ -580,6 +639,13 @@ export default function App() {
     setSections(updatedSections)
     await saveSections(updatedSections)
     
+    // Sync with Chrome bookmarks
+    const favoritesSection = updatedSections.find(s => s.type === 'favorites')
+    if (favoritesSection) {
+      await syncFavoritesWithChrome(favoritesSection)
+      await backupFavorites(favoritesSection)
+    }
+    
     // Rename the tab group
     const currentWindow = await chrome.windows.getCurrent()
     await renameFolderTabGroup(oldName, newName, currentWindow.id)
@@ -591,6 +657,13 @@ export default function App() {
       setSections(updatedSections)
       await saveSections(updatedSections)
       
+      // Sync with Chrome bookmarks
+      const favoritesSection = updatedSections.find(s => s.type === 'favorites')
+      if (favoritesSection) {
+        await syncFavoritesWithChrome(favoritesSection)
+        await backupFavorites(favoritesSection)
+      }
+      
       // Remove the tab group
       const currentWindow = await chrome.windows.getCurrent()
       await removeFolderTabGroup(folder.name, currentWindow.id)
@@ -598,10 +671,15 @@ export default function App() {
   }
 
   const handleDropIntoFolder = async (folder: Folder, dragData: any) => {
-    console.log('Dropping into folder:', folder.name, dragData)
+    console.log('🎯 handleDropIntoFolder called')
+    console.log('📁 Target folder:', folder.name, 'ID:', folder.id)
+    console.log('📦 Drag data:', JSON.stringify(dragData, null, 2))
+    console.info('📍 Debug console test - this should appear in overlay console')
     
-    // Handle dropping items into folders
-    const { item, type, sectionId, index } = dragData
+    try {
+      // Handle dropping items into folders
+      const { item, type, sectionId, index } = dragData
+      console.log('📌 Item type:', type, 'Section:', sectionId)
     
     if (type === 'bookmark' || type === 'tab') {
       let bookmarkToAdd: Bookmark
@@ -614,19 +692,24 @@ export default function App() {
         bookmarkToAdd = item as Bookmark
       }
       
-      console.log('Bookmark to add:', bookmarkToAdd)
+      console.log('📚 Bookmark to add:', bookmarkToAdd)
+      console.log('📚 Bookmark ID:', bookmarkToAdd.id, 'URL:', bookmarkToAdd.url)
       
       // If it's a bookmark from favorites, use moveBookmarkToFolder
       if (type === 'bookmark' && sectionId === 'favorites') {
+        console.log('🔄 Moving existing bookmark from favorites')
+        console.log('🔍 Current sections before move:', sections)
         const updatedSections = moveBookmarkToFolder(sections, bookmarkToAdd.id, folder.id)
+        console.log('✅ Sections after move:', updatedSections)
         setSections(updatedSections)
         await saveSections(updatedSections)
-        console.log('Moved bookmark to folder using moveBookmarkToFolder')
+        console.log('💾 Saved to storage successfully')
         
         // Sync with Chrome bookmarks and reorder tab group
         const updatedFavoritesSection = updatedSections.find(s => s.type === 'favorites')
         if (updatedFavoritesSection) {
           await syncFavoritesWithChrome(updatedFavoritesSection)
+          await backupFavorites(updatedFavoritesSection)
           
           // Reorder tabs in Archy group
           const currentWindow = await chrome.windows.getCurrent()
@@ -708,7 +791,8 @@ export default function App() {
       const updatedFavoritesSection = updatedSections.find(s => s.type === 'favorites')
       if (updatedFavoritesSection) {
         await syncFavoritesWithChrome(updatedFavoritesSection)
-        console.log('Synced with Chrome bookmarks')
+        await backupFavorites(updatedFavoritesSection)
+        console.log('Synced with Chrome bookmarks and created backup')
         
         // Reorder tabs in Archy group
         const currentWindow = await chrome.windows.getCurrent()
@@ -737,7 +821,12 @@ export default function App() {
         })
         
         await reorderArchyGroupTabs(favoriteBookmarks, currentWindow.id)
+        console.log('✅ Tab group reordered successfully')
       }
+    }
+    } catch (error) {
+      console.error('❌ Error in handleDropIntoFolder:', error)
+      console.error('Stack trace:', error.stack)
     }
   }
   
@@ -747,6 +836,13 @@ export default function App() {
       const updatedSections = moveBookmarkToFolder(sections, bookmark.id, targetFolder.id)
       setSections(updatedSections)
       await saveSections(updatedSections)
+      
+      // Sync with Chrome bookmarks
+      const favoritesSection = updatedSections.find(s => s.type === 'favorites')
+      if (favoritesSection) {
+        await syncFavoritesWithChrome(favoritesSection)
+        await backupFavorites(favoritesSection)
+      }
       
       // Sync folder's tab group
       const currentWindow = await chrome.windows.getCurrent()
@@ -789,6 +885,13 @@ export default function App() {
         const updatedSections = moveBookmarkToFolder(sections, bookmark.id, folder.id)
         setSections(updatedSections)
         await saveSections(updatedSections)
+        
+        // Sync with Chrome bookmarks
+        const favoritesSection = updatedSections.find(s => s.type === 'favorites')
+        if (favoritesSection) {
+          await syncFavoritesWithChrome(favoritesSection)
+          await backupFavorites(favoritesSection)
+        }
         
         // Sync folder's tab group
         const currentWindow = await chrome.windows.getCurrent()
@@ -923,6 +1026,15 @@ export default function App() {
       })
       setSections(updatedSections)
       await saveSections(updatedSections)
+      
+      // Sync with Chrome bookmarks if favorites section was modified
+      if (dragData.sectionId === 'favorites') {
+        const favoritesSection = updatedSections.find(s => s.type === 'favorites')
+        if (favoritesSection) {
+          await syncFavoritesWithChrome(favoritesSection)
+          await backupFavorites(favoritesSection)
+        }
+      }
     } else {
       // Moving between sections
       let draggedItem: Tab | Bookmark | Folder | null = null
@@ -973,6 +1085,7 @@ export default function App() {
         const favoritesSection = updatedSections.find(s => s.type === 'favorites')
         if (favoritesSection) {
           await syncFavoritesWithChrome(favoritesSection)
+          await backupFavorites(favoritesSection)
           
           // Reorder tabs in Archy group based on new favorites order
           const currentWindow = await chrome.windows.getCurrent()
@@ -1064,6 +1177,13 @@ export default function App() {
   })
 
   // Initial load effect
+  useEffect(() => {
+    // Load debug mode state
+    chrome.storage.local.get('debugMode', (result) => {
+      setDebugMode(result.debugMode || false)
+    })
+  }, [])
+  
   useEffect(() => {
     if (!isInitialized) {
       // Load saved sections immediately (including favorites/folders)
@@ -1257,7 +1377,7 @@ export default function App() {
   // Remove the full-screen loading state
 
   return (
-    <div className="h-full flex flex-col bg-gray-900">
+    <div className="h-full flex flex-col bg-gray-900 relative">
       <div className="sidebar-header">
         <div className="flex items-center gap-2">
           <h1 className="text-lg font-semibold text-gray-100">
@@ -1282,12 +1402,48 @@ export default function App() {
           >
             <Plus className="w-4 h-4" />
           </button>
-          <button
-            className="p-2 hover:bg-gray-800 rounded-md transition-colors text-gray-400 hover:text-gray-200"
-            title="Settings"
-          >
-            <Settings className="w-4 h-4" />
-          </button>
+          <div className="relative">
+            <button
+              onClick={() => setShowSettingsMenu(!showSettingsMenu)}
+              className="p-2 hover:bg-gray-800 rounded-md transition-colors text-gray-400 hover:text-gray-200"
+              title="Settings"
+            >
+              <Settings className="w-4 h-4" />
+            </button>
+            
+            {showSettingsMenu && (
+              <div className="absolute right-0 top-full mt-2 w-48 bg-gray-800 rounded-lg shadow-lg border border-gray-700 z-50">
+                <button
+                  onClick={() => {
+                    const newDebugMode = !debugMode
+                    setDebugMode(newDebugMode)
+                    chrome.storage.local.set({ debugMode: newDebugMode })
+                    setShowSettingsMenu(false)
+                    // Notify content scripts about debug mode change
+                    chrome.tabs.query({}, (tabs) => {
+                      tabs.forEach(tab => {
+                        if (tab.id && tab.url && !tab.url.startsWith('chrome://') && !tab.url.startsWith('chrome-extension://')) {
+                          chrome.tabs.sendMessage(tab.id, {
+                            type: 'DEBUG_MODE_CHANGED',
+                            enabled: newDebugMode
+                          }).catch(() => {})
+                        }
+                      })
+                    })
+                  }}
+                  className={`w-full flex items-center gap-2 px-4 py-2 text-left hover:bg-gray-700 rounded-t-lg transition-colors ${
+                    debugMode ? 'text-green-400' : 'text-gray-400'
+                  }`}
+                >
+                  <Bug className="w-4 h-4" />
+                  <span className="text-sm">Debug Mode</span>
+                  {debugMode && (
+                    <span className="ml-auto text-xs bg-green-600 px-2 py-0.5 rounded">ON</span>
+                  )}
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 

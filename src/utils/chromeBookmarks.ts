@@ -1,6 +1,7 @@
 // Chrome Bookmarks API integration for Archy favorites
 
 const ARCHY_FOLDER_NAME = 'Archy Favorites'
+const ARCHY_BACKUP_FOLDER = 'Archy Backup'
 
 // Get or create the Archy bookmarks folder
 export async function getOrCreateArchyFolder(): Promise<chrome.bookmarks.BookmarkTreeNode> {
@@ -256,22 +257,55 @@ export async function syncFavoritesWithChrome(favoritesSection: any): Promise<vo
   }
 }
 
-// Load favorites from Chrome bookmarks
-export async function loadFavoritesFromChrome(): Promise<Array<{url: string, title: string, id: string}>> {
+// Load favorites from Chrome bookmarks (including nested structure)
+export async function loadFavoritesFromChrome(): Promise<any[]> {
   try {
     const folder = await getOrCreateArchyFolder()
-    const children = await chrome.bookmarks.getChildren(folder.id)
     
-    return children
-      .filter(child => child.url) // Only bookmarks, not folders
-      .map(child => ({
-        id: child.id,
-        url: child.url!,
-        title: child.title
-      }))
+    // Recursive function to load items with folders
+    async function loadItems(parentId: string): Promise<any[]> {
+      const children = await chrome.bookmarks.getChildren(parentId)
+      const items: any[] = []
+      
+      for (const child of children) {
+        if (child.url) {
+          // It's a bookmark
+          items.push({
+            id: child.id,
+            url: child.url,
+            title: child.title,
+            favicon: await getFaviconUrl(child.url)
+          })
+        } else {
+          // It's a folder
+          const folderItems = await loadItems(child.id)
+          items.push({
+            id: child.id,
+            type: 'folder',
+            name: child.title,
+            collapsed: false,
+            items: folderItems
+          })
+        }
+      }
+      
+      return items
+    }
+    
+    return await loadItems(folder.id)
   } catch (error) {
     console.error('Error loading favorites from Chrome:', error)
     return []
+  }
+}
+
+// Helper to get favicon URL
+function getFaviconUrl(url: string): string {
+  try {
+    const urlObj = new URL(url)
+    return `https://www.google.com/s2/favicons?domain=${urlObj.hostname}&sz=32`
+  } catch {
+    return ''
   }
 }
 
@@ -308,5 +342,176 @@ export async function addBookmarkToFolder(
     console.log('Added bookmark to folder:', folderId)
   } catch (error) {
     console.error('Error adding bookmark to folder:', error)
+  }
+}
+
+// Initialize Archy bookmarks from current tabs if empty
+export async function initializeArchyBookmarks(): Promise<boolean> {
+  try {
+    const folder = await getOrCreateArchyFolder()
+    const children = await chrome.bookmarks.getChildren(folder.id)
+    
+    // If folder already has content, don't initialize
+    if (children.length > 0) {
+      console.log('Archy folder already has bookmarks, skipping initialization')
+      return false
+    }
+    
+    console.log('Initializing Archy bookmarks from current tabs...')
+    
+    // Get all current tabs
+    const windows = await chrome.windows.getAll({ populate: true })
+    const allTabs: chrome.tabs.Tab[] = []
+    
+    for (const window of windows) {
+      if (window.type === 'normal' && window.tabs) {
+        allTabs.push(...window.tabs)
+      }
+    }
+    
+    // Group tabs by domain for better organization
+    const tabsByDomain = new Map<string, chrome.tabs.Tab[]>()
+    const pinnedTabs: chrome.tabs.Tab[] = []
+    
+    for (const tab of allTabs) {
+      if (!tab.url || tab.url.startsWith('chrome://') || tab.url.startsWith('chrome-extension://')) {
+        continue
+      }
+      
+      if (tab.pinned) {
+        pinnedTabs.push(tab)
+      } else {
+        try {
+          const url = new URL(tab.url)
+          const domain = url.hostname
+          if (!tabsByDomain.has(domain)) {
+            tabsByDomain.set(domain, [])
+          }
+          tabsByDomain.get(domain)!.push(tab)
+        } catch {}
+      }
+    }
+    
+    // Create folders for domains with multiple tabs
+    for (const [domain, tabs] of tabsByDomain) {
+      if (tabs.length > 1) {
+        // Create a folder for this domain
+        const folderName = domain.replace('www.', '')
+        const folder = await chrome.bookmarks.create({
+          parentId: folder.id,
+          title: folderName
+        })
+        
+        // Add tabs to the folder
+        for (const tab of tabs) {
+          if (tab.url && tab.title) {
+            await chrome.bookmarks.create({
+              parentId: folder.id,
+              title: tab.title,
+              url: tab.url
+            })
+          }
+        }
+      } else {
+        // Add single tab directly
+        const tab = tabs[0]
+        if (tab.url && tab.title) {
+          await chrome.bookmarks.create({
+            parentId: folder.id,
+            title: tab.title,
+            url: tab.url
+          })
+        }
+      }
+    }
+    
+    // Add pinned tabs at the top
+    if (pinnedTabs.length > 0) {
+      const pinnedFolder = await chrome.bookmarks.create({
+        parentId: folder.id,
+        title: '📌 Pinned',
+        index: 0
+      })
+      
+      for (const tab of pinnedTabs) {
+        if (tab.url && tab.title) {
+          await chrome.bookmarks.create({
+            parentId: pinnedFolder.id,
+            title: tab.title,
+            url: tab.url
+          })
+        }
+      }
+    }
+    
+    console.log('Successfully initialized Archy bookmarks from tabs')
+    return true
+  } catch (error) {
+    console.error('Error initializing Archy bookmarks:', error)
+    return false
+  }
+}
+
+// Create a backup of current favorites
+export async function backupFavorites(favorites: any): Promise<void> {
+  try {
+    // Get or create backup folder
+    const searchResults = await chrome.bookmarks.search({ title: ARCHY_BACKUP_FOLDER })
+    let backupFolder = searchResults.find(node => 
+      !node.url && node.title === ARCHY_BACKUP_FOLDER
+    )
+    
+    if (!backupFolder) {
+      backupFolder = await chrome.bookmarks.create({
+        parentId: '1', // Bookmarks bar
+        title: ARCHY_BACKUP_FOLDER
+      })
+    }
+    
+    // Create timestamp folder
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
+    const timestampFolder = await chrome.bookmarks.create({
+      parentId: backupFolder.id,
+      title: `Backup ${timestamp}`
+    })
+    
+    // Recursively backup items
+    async function backupItems(items: any[], parentId: string) {
+      for (const item of items) {
+        if (item && 'type' in item && item.type === 'folder') {
+          const folder = await chrome.bookmarks.create({
+            parentId,
+            title: item.name
+          })
+          if (item.items && item.items.length > 0) {
+            await backupItems(item.items, folder.id)
+          }
+        } else if (item && 'url' in item) {
+          await chrome.bookmarks.create({
+            parentId,
+            title: item.title,
+            url: item.url
+          })
+        }
+      }
+    }
+    
+    if (favorites.items && favorites.items.length > 0) {
+      await backupItems(favorites.items, timestampFolder.id)
+    }
+    
+    console.log('Created backup of favorites:', timestamp)
+    
+    // Clean old backups (keep only last 5)
+    const backupChildren = await chrome.bookmarks.getChildren(backupFolder.id)
+    if (backupChildren.length > 5) {
+      const toRemove = backupChildren.slice(0, backupChildren.length - 5)
+      for (const child of toRemove) {
+        await chrome.bookmarks.removeTree(child.id)
+      }
+      console.log('Cleaned old backups')
+    }
+  } catch (error) {
+    console.error('Error creating backup:', error)
   }
 }

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Archy - Vertical Tabs Manager",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "AI-powered vertical tabs manager for organized and efficient browsing",
   "permissions": [
     "tabs",
@@ -70,6 +70,13 @@
         "mac": "Command+Shift+K"
       },
       "description": "Open Archy overlay"
+    },
+    "toggle-debug-console": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+L",
+        "mac": "Command+Shift+L"
+      },
+      "description": "Toggle Debug Console"
     }
   },
   "content_security_policy": {

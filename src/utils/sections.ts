@@ -322,10 +322,16 @@ export function toggleFolderCollapse(sections: Section[], folderId: string): Sec
 
 // Add bookmark to folder
 export function addBookmarkToFolder(sections: Section[], folderId: string, bookmark: Bookmark): Section[] {
-  return sections.map(section => ({
+  console.log('➕ addBookmarkToFolder called')
+  console.log('📁 Target folder ID:', folderId)
+  console.log('📚 Bookmark to add:', bookmark)
+  
+  const result = sections.map(section => ({
     ...section,
     items: section.items.map(item => {
       if (item && 'type' in item && item.type === 'folder' && item.id === folderId) {
+        console.log('✅ Found target folder:', item.name)
+        console.log('📋 Current items in folder:', item.items.length)
         return {
           ...item,
           items: [...item.items, bookmark]
@@ -334,6 +340,9 @@ export function addBookmarkToFolder(sections: Section[], folderId: string, bookm
       return item
     })
   }))
+  
+  console.log('🔄 Updated sections after adding bookmark to folder')
+  return result
 }
 
 // Remove bookmark from folder
@@ -354,6 +363,11 @@ export function removeBookmarkFromFolder(sections: Section[], folderId: string, 
 
 // Move bookmark from one location to folder
 export function moveBookmarkToFolder(sections: Section[], bookmarkId: string, targetFolderId: string): Section[] {
+  console.log('🔄 moveBookmarkToFolder called')
+  console.log('📌 Bookmark ID:', bookmarkId)
+  console.log('📁 Target folder ID:', targetFolderId)
+  console.log('📊 Sections count:', sections.length)
+  
   let bookmarkToMove: Bookmark | null = null
   
   // First, find and remove the bookmark from its current location
@@ -383,9 +397,13 @@ export function moveBookmarkToFolder(sections: Section[], bookmarkId: string, ta
   
   // Then add it to the target folder
   if (bookmarkToMove) {
+    console.log('✅ Found bookmark to move:', bookmarkToMove)
     updatedSections = addBookmarkToFolder(updatedSections, targetFolderId, bookmarkToMove)
+  } else {
+    console.log('❌ Bookmark not found with ID:', bookmarkId)
   }
   
+  console.log('📊 Final sections after move:', updatedSections)
   return updatedSections
 }
 
