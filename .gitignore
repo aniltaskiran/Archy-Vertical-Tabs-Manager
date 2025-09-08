@@ -1,40 +1,73 @@
 # Dependencies
 node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
+.pnp
+.pnp.js
 
-# Build output
+# Build outputs
 dist/
 build/
+*.zip
 
-# IDE and editor files
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-.DS_Store
+# Testing
+coverage/
+.nyc_output/
 
 # Environment files
-.env
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
 
 # Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
 logs/
 *.log
 
-# Testing
-coverage/
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+!.vscode/launch.json
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# TypeScript
+*.tsbuildinfo
+
+# Cache
+.eslintcache
+.stylelintcache
+.prettiercache
 
 # Temporary files
 *.tmp
+*.temp
+.tmp/
+.temp/
 temp/
 tmp/
 
-# Package manager files
+# Performance analysis
+stats.html
+.analyze/
+
+# Chrome extension specific
+*.crx
+*.pem
+key.pem
+
+# Husky
+.husky/_/
+
+# Backup files
+*.backup
 package-lock.json.backup
 yarn.lock.backup

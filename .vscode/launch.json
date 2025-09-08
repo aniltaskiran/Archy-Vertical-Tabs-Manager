@@ -1,0 +1,26 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Launch Chrome Extension",
+      "type": "chrome",
+      "request": "launch",
+      "url": "chrome://extensions/",
+      "webRoot": "${workspaceFolder}/src",
+      "runtimeArgs": [
+        "--load-extension=${workspaceFolder}/dist"
+      ]
+    },
+    {
+      "name": "Debug Service Worker",
+      "type": "chrome",
+      "request": "attach",
+      "port": 9222,
+      "webRoot": "${workspaceFolder}/src",
+      "url": "chrome://extensions/",
+      "sourceMapPathOverrides": {
+        "webpack:///src/*": "${webRoot}/*"
+      }
+    }
+  ]
+}

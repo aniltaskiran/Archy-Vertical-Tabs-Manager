@@ -86,6 +86,53 @@ document.addEventListener('keydown', (e) => {
   
   if (!isOpen) return
   
+  // Check if search input is focused
+  const searchInput = document.querySelector('#archy-search-input') as HTMLInputElement
+  const isSearchFocused = document.activeElement === searchInput
+  
+  // Cmd/Ctrl + K - Clear search and focus
+  if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+    e.preventDefault()
+    if (searchInput) {
+      searchInput.value = ''
+      searchInput.focus()
+      handleSearch({ target: searchInput } as any)
+    }
+    return
+  }
+  
+  // Cmd/Ctrl + Number (1-9) - Quick switch to tab by position
+  if ((e.metaKey || e.ctrlKey) && e.key >= '1' && e.key <= '9') {
+    e.preventDefault()
+    const index = parseInt(e.key) - 1
+    if (visibleTabs[index]) {
+      highlightTab(index)
+      selectCurrentTab()
+    }
+    return
+  }
+  
+  // Cmd/Ctrl + W - Close selected tab
+  if ((e.metaKey || e.ctrlKey) && e.key === 'w') {
+    e.preventDefault()
+    closeSelectedTab()
+    return
+  }
+  
+  // Cmd/Ctrl + Enter - Open selected tab in new window
+  if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+    e.preventDefault()
+    openSelectedTabInNewWindow()
+    return
+  }
+  
+  // Delete/Backspace - Close selected tab (only when not in search input)
+  if (!isSearchFocused && (e.key === 'Delete' || e.key === 'Backspace')) {
+    e.preventDefault()
+    closeSelectedTab()
+    return
+  }
+  
   switch(e.key) {
     case 'Escape':
       closeOverlay()
@@ -98,9 +145,19 @@ document.addEventListener('keydown', (e) => {
       e.preventDefault()
       navigateUp()
       break
-    case 'Enter':
+    case 'Tab':
       e.preventDefault()
-      selectCurrentTab()
+      if (e.shiftKey) {
+        navigateUp()
+      } else {
+        navigateDown()
+      }
+      break
+    case 'Enter':
+      if (!e.metaKey && !e.ctrlKey) {
+        e.preventDefault()
+        selectCurrentTab()
+      }
       break
   }
 }, true) // Use capture phase to intercept before other handlers
@@ -296,7 +353,18 @@ function renderTabs(tabs: any[]) {
   const tabsList = document.querySelector('#archy-tabs-list')
   if (!tabsList) return
   
-  tabsList.innerHTML = tabs.map((tab, index) => `
+  // Always add "Create new tab" option at the top
+  const createNewTabHtml = `
+    <div class="archy-tab-item archy-new-tab-option" data-query="">
+      <div class="archy-tab-favicon">➕</div>
+      <div class="archy-tab-content">
+        <div class="archy-tab-title">Create new tab</div>
+        <div class="archy-tab-url">Open a new empty tab</div>
+      </div>
+    </div>
+  `
+  
+  const tabsHtml = tabs.map((tab, index) => `
     <div class="archy-tab-item" data-tab-id="${tab.id}" data-window-id="${tab.windowId}" data-index="${index}">
       <img src="${tab.favIconUrl || chrome.runtime.getURL('icons/icon-16.png')}" alt="" class="archy-tab-favicon">
       <div class="archy-tab-content">
@@ -309,7 +377,10 @@ function renderTabs(tabs: any[]) {
     </div>
   `).join('')
   
-  // Update visible tabs list and highlight first item
+  // Combine create new tab option with existing tabs
+  tabsList.innerHTML = createNewTabHtml + tabsHtml
+  
+  // Update visible tabs list and highlight first item (Create new tab)
   updateVisibleTabs()
   if (visibleTabs.length > 0) {
     highlightTab(0)
@@ -319,7 +390,12 @@ function renderTabs(tabs: any[]) {
   document.querySelectorAll('.archy-tab-item').forEach(item => {
     item.addEventListener('click', (e) => {
       const target = e.target as HTMLElement
-      if (!target.classList.contains('archy-tab-close')) {
+      
+      // Check if it's the create new tab option
+      if (item.classList.contains('archy-new-tab-option')) {
+        const query = item.getAttribute('data-query') || ''
+        createNewTabWithSearch(query)
+      } else if (!target.classList.contains('archy-tab-close')) {
         const tabId = parseInt(item.getAttribute('data-tab-id') || '0')
         const windowId = parseInt(item.getAttribute('data-window-id') || '0')
         switchToTab(tabId, windowId)
@@ -356,23 +432,63 @@ function closeTab(tabId: number) {
 
 function handleSearch(e: Event) {
   const query = (e.target as HTMLInputElement).value.toLowerCase()
+  const originalQuery = (e.target as HTMLInputElement).value // Keep original case for new tab
   const items = document.querySelectorAll('.archy-tab-item')
   
+  let hasVisibleItems = false
+  let newTabOption: HTMLElement | null = null
+  
   items.forEach(item => {
+    // Handle the new tab option separately
+    if (item.classList.contains('archy-new-tab-option')) {
+      newTabOption = item as HTMLElement
+      return
+    }
+    
     const title = item.querySelector('.archy-tab-title')?.textContent?.toLowerCase() || ''
     const url = item.querySelector('.archy-tab-url')?.textContent?.toLowerCase() || ''
     
-    if (title.includes(query) || url.includes(query)) {
+    if (query === '' || title.includes(query) || url.includes(query)) {
       (item as HTMLElement).style.display = 'flex'
+      hasVisibleItems = true
     } else {
       (item as HTMLElement).style.display = 'none'
     }
   })
   
+  // Update "create new tab" option based on search
+  if (newTabOption) {
+    // Update the existing new tab option
+    newTabOption.setAttribute('data-query', originalQuery)
+    const title = newTabOption.querySelector('.archy-tab-title')
+    const subtitle = newTabOption.querySelector('.archy-tab-url')
+    
+    if (originalQuery.trim() !== '') {
+      // Has search query
+      if (title) title.textContent = `Search for "${originalQuery}"`
+      if (subtitle) subtitle.textContent = 'Open new tab with Google search'
+      
+      // Show new tab option at top when no results
+      if (!hasVisibleItems) {
+        newTabOption.style.display = 'flex'
+      } else {
+        // Hide when there are matching tabs
+        newTabOption.style.display = 'none'
+      }
+    } else {
+      // No search query - show "Create new tab"
+      if (title) title.textContent = 'Create new tab'
+      if (subtitle) subtitle.textContent = 'Open a new empty tab'
+      newTabOption.style.display = 'flex'
+    }
+  }
+  
   // Update visible tabs after filtering
   updateVisibleTabs()
   if (visibleTabs.length > 0) {
+    // Always select the first item (which will be "Create new tab" if it exists)
     highlightTab(0)
+    selectedIndex = 0
   }
 }
 
@@ -412,9 +528,86 @@ function navigateUp() {
 
 function selectCurrentTab() {
   if (visibleTabs[selectedIndex]) {
-    const tabId = parseInt(visibleTabs[selectedIndex].getAttribute('data-tab-id') || '0')
-    const windowId = parseInt(visibleTabs[selectedIndex].getAttribute('data-window-id') || '0')
-    switchToTab(tabId, windowId)
+    const selectedTab = visibleTabs[selectedIndex]
+    
+    // Check if it's the "create new tab" option
+    if (selectedTab.classList.contains('archy-new-tab-option')) {
+      const query = selectedTab.getAttribute('data-query') || ''
+      createNewTabWithSearch(query)
+    } else {
+      // Regular tab switching
+      const tabId = parseInt(selectedTab.getAttribute('data-tab-id') || '0')
+      const windowId = parseInt(selectedTab.getAttribute('data-window-id') || '0')
+      switchToTab(tabId, windowId)
+    }
+  }
+}
+
+function createNewTabWithSearch(query: string) {
+  let url: string | undefined
+  
+  if (query && query.trim() !== '') {
+    // Create a Google search URL with the query
+    url = `https://www.google.com/search?q=${encodeURIComponent(query)}`
+  }
+  // If query is empty, url remains undefined and will open a new empty tab
+  
+  // Send message to background script to create a new tab
+  chrome.runtime.sendMessage({
+    type: 'CREATE_NEW_TAB',
+    url: url
+  })
+  
+  // Close the overlay
+  closeOverlay()
+}
+
+function closeSelectedTab() {
+  if (visibleTabs[selectedIndex]) {
+    const selectedTab = visibleTabs[selectedIndex]
+    
+    // Don't close if it's the "create new tab" option
+    if (selectedTab.classList.contains('archy-new-tab-option')) {
+      return
+    }
+    
+    const tabId = parseInt(selectedTab.getAttribute('data-tab-id') || '0')
+    if (tabId) {
+      closeTab(tabId)
+    }
+  }
+}
+
+function openSelectedTabInNewWindow() {
+  if (visibleTabs[selectedIndex]) {
+    const selectedTab = visibleTabs[selectedIndex]
+    
+    // Handle "create new tab" option - open new window with new tab
+    if (selectedTab.classList.contains('archy-new-tab-option')) {
+      const query = selectedTab.getAttribute('data-query') || ''
+      let url: string | undefined
+      
+      if (query && query.trim() !== '') {
+        url = `https://www.google.com/search?q=${encodeURIComponent(query)}`
+      }
+      
+      chrome.runtime.sendMessage({
+        type: 'CREATE_NEW_WINDOW',
+        url: url
+      })
+      closeOverlay()
+      return
+    }
+    
+    // For regular tabs, move to new window
+    const tabId = parseInt(selectedTab.getAttribute('data-tab-id') || '0')
+    if (tabId) {
+      chrome.runtime.sendMessage({
+        type: 'MOVE_TAB_TO_NEW_WINDOW',
+        tabId: tabId
+      })
+      closeOverlay()
+    }
   }
 }
 

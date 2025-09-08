@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Archy - Vertical Tabs Manager",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "AI-powered vertical tabs manager for organized and efficient browsing",
   "permissions": [
     "tabs",

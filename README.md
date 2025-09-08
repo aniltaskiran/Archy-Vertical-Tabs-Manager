@@ -2,6 +2,8 @@
 
 A powerful Chrome extension for managing tabs vertically with AI-powered organization, inspired by Arc browser's design.
 
+<!-- Test edit by Claude Web Wrapper at 2025-09-07 19:05 -->
+
 ![Version](https://img.shields.io/badge/version-0.3.0-blue)
 ![Chrome Extension](https://img.shields.io/badge/Chrome-Extension-green)
 ![License](https://img.shields.io/badge/license-MIT-blue)
@@ -88,6 +90,15 @@ npm run build
 
 ## Development
 
+### Developer Experience Enhancements
+- **Hot Reload**: Automatic extension reload during development
+- **Debug Utilities**: Built-in debug logging and performance monitoring
+- **Error Handling**: Comprehensive error handling with recovery strategies
+- **Test Suite**: Jest testing with Chrome API mocks
+- **Bundle Analysis**: Visualize and optimize bundle size
+- **Code Quality**: ESLint, Prettier, and Husky pre-commit hooks
+- **Environment Configs**: Separate development and production configurations
+
 ### Setup
 ```bash
 # Install dependencies
@@ -96,11 +107,35 @@ npm install
 # Start development build with watch mode
 npm run dev
 
+# Development with auto-reload
+npm run dev:reload
+
+# Development with debugging
+npm run dev:debug
+
 # Build for production
 npm run build
 
+# Run tests
+npm run test
+
+# Run tests in watch mode
+npm run test:watch
+
 # Type checking
 npm run type-check
+
+# Lint and fix code
+npm run lint:fix
+
+# Format code
+npm run format
+
+# Bundle size analysis
+npm run analyze
+
+# Create extension package for Chrome Web Store
+npm run zip
 ```
 
 ### Project Structure
@@ -109,12 +144,25 @@ Archy-Vertical-Tabs-Manager/
 ├── src/
 │   ├── background/       # Background service worker
 │   ├── sidepanel/       # Main UI application
+│   ├── welcome/         # Welcome page for onboarding
+│   ├── content/         # Content scripts and overlay
 │   ├── components/      # React components
 │   ├── hooks/          # Custom React hooks
 │   ├── utils/          # Utility functions
+│   │   ├── chromeHelpers.ts   # Chrome API helpers
+│   │   ├── debug.ts           # Debug utilities
+│   │   ├── errorHandler.ts    # Error handling
+│   │   └── performance.ts     # Performance monitoring
+│   ├── test/           # Test setup and mocks
 │   └── types/          # TypeScript type definitions
+├── scripts/            # Build and development scripts
+│   ├── auto-reload.js  # Hot reload for development
+│   └── package.sh      # Extension packaging script
 ├── icons/              # Extension icons
 ├── manifest.json       # Chrome extension manifest
+├── jest.config.js      # Jest test configuration
+├── .env.development    # Development environment config
+├── .env.production     # Production environment config
 └── dist/              # Build output
 ```
 
@@ -244,11 +292,13 @@ Archy-Vertical-Tabs-Manager/
 
 ## Roadmap
 
-### Version 0.3.0 (Next)
+### Version 0.4.0 (Next)
 - [ ] Tab grouping with colors and custom names
 - [ ] Tab suspension for memory optimization
 - [ ] Import/Export settings and sessions
 - [ ] Custom theme support (light/dark/custom)
+- [ ] Enhanced debugging tools and performance monitoring
+- [ ] Automated testing suite with Jest
 
 ### Version 1.0.0 (Planned)
 - [ ] Multiple workspaces support

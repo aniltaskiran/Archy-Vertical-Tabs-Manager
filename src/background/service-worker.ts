@@ -296,7 +296,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       return true
 
     case 'CREATE_NEW_TAB':
-      createNewTab(message.windowId).then(sendResponse)
+      createNewTab(message.windowId, message.url).then(sendResponse)
+      return true
+    
+    case 'CREATE_NEW_WINDOW':
+      createNewWindow(message.url).then(sendResponse)
+      return true
+    
+    case 'MOVE_TAB_TO_NEW_WINDOW':
+      moveTabToNewWindow(message.tabId).then(sendResponse)
       return true
       
     case 'PING_SIDEPANEL':
@@ -353,10 +361,11 @@ async function closeTab(tabId: number) {
   }
 }
 
-async function createNewTab(windowId?: number) {
+async function createNewTab(windowId?: number, url?: string) {
   try {
     const tab = await chrome.tabs.create({ 
-      windowId: windowId || undefined 
+      windowId: windowId || undefined,
+      url: url || undefined 
     })
     return { success: true, tab }
   } catch (error) {
@@ -386,5 +395,36 @@ async function getTabsForOverlay() {
   } catch (error) {
     console.error('Error getting tabs for overlay:', error)
     return { tabs: [] }
+  }
+}
+
+async function createNewWindow(url?: string) {
+  try {
+    const window = await chrome.windows.create({
+      url: url || undefined,
+      focused: true
+    })
+    return { success: true, window }
+  } catch (error) {
+    console.error('Error creating new window:', error)
+    return { success: false, error: error.message }
+  }
+}
+
+async function moveTabToNewWindow(tabId: number) {
+  try {
+    // First get the tab details
+    const tab = await chrome.tabs.get(tabId)
+    
+    // Create a new window with the tab
+    const window = await chrome.windows.create({
+      tabId: tabId,
+      focused: true
+    })
+    
+    return { success: true, window }
+  } catch (error) {
+    console.error('Error moving tab to new window:', error)
+    return { success: false, error: error.message }
   }
 }
