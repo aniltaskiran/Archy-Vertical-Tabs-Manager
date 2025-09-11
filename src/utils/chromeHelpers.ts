@@ -5,8 +5,13 @@ export const tabs = {
   
   getByGroup: (groupId: number) => chrome.tabs.query({ groupId }),
   
-  create: (url: string, options?: Partial<chrome.tabs.CreateProperties>) => 
-    chrome.tabs.create({ url, ...options }),
+  create: (url: string, options?: Partial<chrome.tabs.CreateProperties>) => {
+    // Ensure URL has proper protocol
+    const formattedUrl = url.startsWith('http://') || url.startsWith('https://') || url.startsWith('chrome://') || url.startsWith('chrome-extension://')
+      ? url
+      : `https://${url}`;
+    return chrome.tabs.create({ url: formattedUrl, ...options });
+  },
   
   update: (tabId: number, props: chrome.tabs.UpdateProperties) => 
     chrome.tabs.update(tabId, props),

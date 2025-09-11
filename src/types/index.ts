@@ -32,6 +32,63 @@ export interface AppSettings {
   showTabsForSelectedWindow: boolean
   sidebarWidth: number
   autoGroupTabs: boolean
+  enabledPlugins: string[]
+}
+
+export interface Plugin {
+  id: string
+  name: string
+  version: string
+  description: string
+  author: string
+  icon?: string
+  code: string
+  permissions: string[]
+  category: 'productivity' | 'tabs' | 'ui' | 'utility' | 'experimental'
+  rating: number
+  downloads: number
+  lastUpdated: string
+}
+
+export interface PluginExecutionContext {
+  tabs: Tab[]
+  groups: TabGroup[]
+  windows: ChromeWindow[]
+  settings: AppSettings
+  chrome: typeof chrome
+}
+
+export interface XbarPlugin {
+  id: string
+  name: string
+  version: string
+  description: string
+  author: string
+  icon?: string
+  script: string
+  refreshInterval: number // in milliseconds
+  permissions: string[]
+  category: 'productivity' | 'tabs' | 'ui' | 'utility' | 'experimental'
+  lastUpdated: string
+  outputFormat: 'text' | 'json'
+}
+
+export interface XbarPluginOutput {
+  text: string
+  lines: XbarPluginLine[]
+  lastUpdated: number
+}
+
+export interface XbarPluginLine {
+  text: string
+  dropdown?: boolean
+  submenu?: boolean
+  level: number
+  href?: string
+  onclick?: string
+  color?: string
+  font?: string
+  size?: number
 }
 
 export interface Section {
@@ -47,6 +104,26 @@ export interface Bookmark {
   title: string
   url: string
   favicon?: string
+}
+
+export interface HistoryItem {
+  id: string
+  title: string
+  url: string
+  lastVisitTime?: number
+  visitCount?: number
+}
+
+export interface SearchResult {
+  id: string
+  title: string
+  url: string
+  favicon?: string
+  type: 'tab' | 'bookmark' | 'history'
+  tabId?: number
+  windowId?: number
+  lastVisitTime?: number
+  visitCount?: number
 }
 
 export interface Folder {

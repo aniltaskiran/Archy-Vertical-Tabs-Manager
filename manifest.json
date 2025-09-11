@@ -9,7 +9,8 @@
     "sidePanel",
     "tabGroups",
     "activeTab",
-    "bookmarks"
+    "bookmarks",
+    "history"
   ],
   "background": {
     "service_worker": "src/background/service-worker.js"

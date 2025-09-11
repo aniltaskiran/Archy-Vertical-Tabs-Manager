@@ -1,13 +1,15 @@
 import React, { useEffect, useState } from 'react'
-import { Search, Settings, Plus, Archive, Star, Bug, Sparkles } from 'lucide-react'
+import { Search, Settings, Plus, Archive, Star, Bug, Sparkles, Puzzle } from 'lucide-react'
 import SearchBar from '../components/SearchBar'
 import Section from '../components/Section'
 import ContextMenu from '../components/ContextMenu'
 import BookmarkContextMenu from '../components/BookmarkContextMenu'
 import FolderContextMenu from '../components/FolderContextMenu'
 import NewWorkspaceButton from '../components/NewWorkspaceButton'
+import PluginMarketplace from '../components/PluginMarketplace'
 import { Tab, ChromeWindow, Section as SectionType, Bookmark, Folder } from '../types'
 import { useSimpleDragDrop, DragData } from '../hooks/useSimpleDragDrop'
+import { pluginSystem, initializePluginSystem, togglePlugin } from '../utils/pluginSystem'
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
 import { 
   addChromeBookmark, 
@@ -76,7 +78,9 @@ export default function App() {
   } | null>(null)
   const [newFolderId, setNewFolderId] = useState<string | null>(null)
   const [showSettingsMenu, setShowSettingsMenu] = useState(false)
+  const [showPluginMarketplace, setShowPluginMarketplace] = useState(false)
   const [debugMode, setDebugMode] = useState(false)
+  const [enabledPlugins, setEnabledPlugins] = useState<string[]>([])
 
   const loadTabs = async (preserveState: boolean = true) => {
     try {
@@ -1138,12 +1142,29 @@ export default function App() {
     onFocusSearch: handleFocusSearch
   })
 
+  const handlePluginToggle = async (pluginId: string, enabled: boolean) => {
+    try {
+      await togglePlugin(pluginId, enabled)
+      const updatedPlugins = enabled 
+        ? [...enabledPlugins, pluginId]
+        : enabledPlugins.filter(id => id !== pluginId)
+      setEnabledPlugins(updatedPlugins)
+      chrome.storage.local.set({ enabledPlugins: updatedPlugins })
+    } catch (error) {
+      console.error('Failed to toggle plugin:', error)
+    }
+  }
+
   // Initial load effect
   useEffect(() => {
-    // Load debug mode state
-    chrome.storage.local.get('debugMode', (result) => {
+    // Load debug mode state and initialize plugin system
+    chrome.storage.local.get(['debugMode', 'enabledPlugins'], (result) => {
       setDebugMode(result.debugMode || false)
+      setEnabledPlugins(result.enabledPlugins || [])
     })
+    
+    // Initialize plugin system
+    initializePluginSystem()
   }, [])
   
   useEffect(() => {
@@ -1405,13 +1426,23 @@ export default function App() {
                 </button>
                 <button
                   onClick={() => {
+                    setShowPluginMarketplace(true)
+                    setShowSettingsMenu(false)
+                  }}
+                  className="w-full flex items-center gap-2 px-4 py-2 text-left hover:bg-gray-700 transition-colors text-gray-400"
+                >
+                  <Puzzle className="w-4 h-4" />
+                  <span className="text-sm">Plugin Marketplace</span>
+                </button>
+                <button
+                  onClick={() => {
                     chrome.tabs.create({
                       url: chrome.runtime.getURL('src/welcome/index.html'),
                       active: true
                     })
                     setShowSettingsMenu(false)
                   }}
-                  className="w-full flex items-center gap-2 px-4 py-2 text-left hover:bg-gray-700 transition-colors text-gray-400"
+                  className="w-full flex items-center gap-2 px-4 py-2 text-left hover:bg-gray-700 rounded-b-lg transition-colors text-gray-400"
                 >
                   <Sparkles className="w-4 h-4" />
                   <span className="text-sm">What's New</span>
@@ -1533,6 +1564,15 @@ export default function App() {
           onRename={handleRenameFolder}
           onDelete={handleDeleteFolder}
           onCreateSubfolder={(parentFolder) => handleCreateSubfolder(parentFolder)}
+        />
+      )}
+
+      {/* Plugin Marketplace */}
+      {showPluginMarketplace && (
+        <PluginMarketplace
+          enabledPlugins={enabledPlugins}
+          onPluginToggle={handlePluginToggle}
+          onClose={() => setShowPluginMarketplace(false)}
         />
       )}
     </div>

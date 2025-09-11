@@ -431,65 +431,133 @@ function closeTab(tabId: number) {
 }
 
 function handleSearch(e: Event) {
-  const query = (e.target as HTMLInputElement).value.toLowerCase()
-  const originalQuery = (e.target as HTMLInputElement).value // Keep original case for new tab
-  const items = document.querySelectorAll('.archy-tab-item')
+  const query = (e.target as HTMLInputElement).value
+  const originalQuery = query // Keep original case for new tab
   
-  let hasVisibleItems = false
-  let newTabOption: HTMLElement | null = null
+  if (query.trim() === '') {
+    // Show tabs only when no search query
+    loadTabs()
+    return
+  }
   
-  items.forEach(item => {
-    // Handle the new tab option separately
-    if (item.classList.contains('archy-new-tab-option')) {
-      newTabOption = item as HTMLElement
-      return
-    }
-    
-    const title = item.querySelector('.archy-tab-title')?.textContent?.toLowerCase() || ''
-    const url = item.querySelector('.archy-tab-url')?.textContent?.toLowerCase() || ''
-    
-    if (query === '' || title.includes(query) || url.includes(query)) {
-      (item as HTMLElement).style.display = 'flex'
-      hasVisibleItems = true
-    } else {
-      (item as HTMLElement).style.display = 'none'
+  // Search across tabs, bookmarks, and history
+  chrome.runtime.sendMessage({ 
+    type: 'SEARCH_ALL', 
+    query: query 
+  }, (response) => {
+    if (response && response.results) {
+      renderSearchResults(response.results, originalQuery)
     }
   })
+}
+
+function renderSearchResults(results: any[], originalQuery: string) {
+  const tabsList = document.querySelector('#archy-tabs-list')
+  if (!tabsList) return
   
-  // Update "create new tab" option based on search
-  if (newTabOption) {
-    // Update the existing new tab option
-    newTabOption.setAttribute('data-query', originalQuery)
-    const title = newTabOption.querySelector('.archy-tab-title')
-    const subtitle = newTabOption.querySelector('.archy-tab-url')
-    
-    if (originalQuery.trim() !== '') {
-      // Has search query
-      if (title) title.textContent = `Search for "${originalQuery}"`
-      if (subtitle) subtitle.textContent = 'Open new tab with Google search'
-      
-      // Show new tab option at top when no results
-      if (!hasVisibleItems) {
-        newTabOption.style.display = 'flex'
-      } else {
-        // Hide when there are matching tabs
-        newTabOption.style.display = 'none'
-      }
-    } else {
-      // No search query - show "Create new tab"
-      if (title) title.textContent = 'Create new tab'
-      if (subtitle) subtitle.textContent = 'Open a new empty tab'
-      newTabOption.style.display = 'flex'
-    }
+  // Always add "Create new tab" option at the top for search
+  const createNewTabHtml = `
+    <div class="archy-tab-item archy-new-tab-option" data-query="${originalQuery}">
+      <div class="archy-tab-favicon">🔍</div>
+      <div class="archy-tab-content">
+        <div class="archy-tab-title">Search for "${originalQuery}"</div>
+        <div class="archy-tab-url">Open new tab with Google search</div>
+      </div>
+    </div>
+  `
+  
+  const resultTypeIcons = {
+    tab: '📄',
+    bookmark: '⭐',
+    history: '🕒'
   }
   
-  // Update visible tabs after filtering
+  const resultsHtml = results.map((result, index) => {
+    const typeIcon = resultTypeIcons[result.type as keyof typeof resultTypeIcons] || '📄'
+    const isTab = result.type === 'tab'
+    const faviconSrc = result.favicon || chrome.runtime.getURL('icons/icon-16.png')
+    
+    return `
+      <div class="archy-tab-item archy-search-result" 
+           data-result-type="${result.type}" 
+           data-result-id="${result.id}"
+           data-tab-id="${result.tabId || ''}" 
+           data-window-id="${result.windowId || ''}" 
+           data-index="${index}">
+        <div class="archy-tab-favicon-container">
+          <img src="${faviconSrc}" alt="" class="archy-tab-favicon" onerror="this.src='${chrome.runtime.getURL('icons/icon-16.png')}'">
+          <span class="archy-result-type-badge">${typeIcon}</span>
+        </div>
+        <div class="archy-tab-content">
+          <div class="archy-tab-title">${result.title}</div>
+          <div class="archy-tab-url">${result.url}</div>
+          ${result.visitCount ? `<div class="archy-tab-meta">Visited ${result.visitCount} times</div>` : ''}
+        </div>
+        ${isTab ? `
+          <div class="archy-tab-actions">
+            <button class="archy-tab-close" data-tab-id="${result.tabId}">×</button>
+          </div>
+        ` : ''}
+      </div>
+    `
+  }).join('')
+  
+  // Combine create new tab option with search results
+  tabsList.innerHTML = createNewTabHtml + resultsHtml
+  
+  // Update visible tabs list and highlight first item
   updateVisibleTabs()
   if (visibleTabs.length > 0) {
-    // Always select the first item (which will be "Create new tab" if it exists)
     highlightTab(0)
-    selectedIndex = 0
   }
+  
+  // Add click handlers
+  document.querySelectorAll('.archy-tab-item').forEach(item => {
+    item.addEventListener('click', (e) => {
+      const target = e.target as HTMLElement
+      
+      // Check if it's the create new tab option
+      if (item.classList.contains('archy-new-tab-option')) {
+        const query = item.getAttribute('data-query') || ''
+        createNewTabWithSearch(query)
+      } else if (item.classList.contains('archy-search-result')) {
+        if (!target.classList.contains('archy-tab-close')) {
+          const resultType = item.getAttribute('data-result-type')
+          const resultId = item.getAttribute('data-result-id')
+          
+          if (resultType === 'tab') {
+            const tabId = parseInt(item.getAttribute('data-tab-id') || '0')
+            const windowId = parseInt(item.getAttribute('data-window-id') || '0')
+            switchToTab(tabId, windowId)
+          } else {
+            // Open bookmark or history item
+            const result = results.find(r => r.id === resultId)
+            if (result) {
+              openSearchResult(result)
+            }
+          }
+        }
+      }
+    })
+  })
+  
+  // Add close handlers for tabs
+  document.querySelectorAll('.archy-tab-close').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation()
+      const tabId = parseInt(btn.getAttribute('data-tab-id') || '0')
+      closeTab(tabId)
+    })
+  })
+}
+
+function openSearchResult(result: any, newWindow = false) {
+  chrome.runtime.sendMessage({ 
+    type: 'OPEN_SEARCH_RESULT', 
+    result,
+    newWindow
+  })
+  closeOverlay()
 }
 
 // Navigation functions
@@ -534,8 +602,28 @@ function selectCurrentTab() {
     if (selectedTab.classList.contains('archy-new-tab-option')) {
       const query = selectedTab.getAttribute('data-query') || ''
       createNewTabWithSearch(query)
+    } else if (selectedTab.classList.contains('archy-search-result')) {
+      // Handle search results (bookmarks, history, or tabs)
+      const resultType = selectedTab.getAttribute('data-result-type')
+      
+      if (resultType === 'tab') {
+        const tabId = parseInt(selectedTab.getAttribute('data-tab-id') || '0')
+        const windowId = parseInt(selectedTab.getAttribute('data-window-id') || '0')
+        switchToTab(tabId, windowId)
+      } else {
+        // For bookmarks and history, open the URL
+        const url = selectedTab.querySelector('.archy-tab-url')?.textContent || ''
+        if (url) {
+          chrome.runtime.sendMessage({
+            type: 'OPEN_SEARCH_RESULT',
+            result: { url, type: resultType },
+            newWindow: false
+          })
+          closeOverlay()
+        }
+      }
     } else {
-      // Regular tab switching
+      // Regular tab switching (fallback)
       const tabId = parseInt(selectedTab.getAttribute('data-tab-id') || '0')
       const windowId = parseInt(selectedTab.getAttribute('data-window-id') || '0')
       switchToTab(tabId, windowId)
@@ -547,8 +635,20 @@ function createNewTabWithSearch(query: string) {
   let url: string | undefined
   
   if (query && query.trim() !== '') {
-    // Create a Google search URL with the query
-    url = `https://www.google.com/search?q=${encodeURIComponent(query)}`
+    const trimmedQuery = query.trim()
+    
+    // Check if it's already a full URL (has protocol)
+    if (trimmedQuery.startsWith('http://') || trimmedQuery.startsWith('https://')) {
+      url = trimmedQuery
+    }
+    // Check if it looks like a domain (contains a dot but no spaces)
+    else if (trimmedQuery.includes('.') && !trimmedQuery.includes(' ') && !trimmedQuery.includes('?')) {
+      url = 'https://' + trimmedQuery
+    }
+    // Otherwise treat as search query
+    else {
+      url = `https://www.google.com/search?q=${encodeURIComponent(trimmedQuery)}`
+    }
   }
   // If query is empty, url remains undefined and will open a new empty tab
   
@@ -588,7 +688,20 @@ function openSelectedTabInNewWindow() {
       let url: string | undefined
       
       if (query && query.trim() !== '') {
-        url = `https://www.google.com/search?q=${encodeURIComponent(query)}`
+        const trimmedQuery = query.trim()
+        
+        // Check if it's already a full URL (has protocol)
+        if (trimmedQuery.startsWith('http://') || trimmedQuery.startsWith('https://')) {
+          url = trimmedQuery
+        }
+        // Check if it looks like a domain (contains a dot but no spaces)
+        else if (trimmedQuery.includes('.') && !trimmedQuery.includes(' ') && !trimmedQuery.includes('?')) {
+          url = 'https://' + trimmedQuery
+        }
+        // Otherwise treat as search query
+        else {
+          url = `https://www.google.com/search?q=${encodeURIComponent(trimmedQuery)}`
+        }
       }
       
       chrome.runtime.sendMessage({
@@ -599,7 +712,36 @@ function openSelectedTabInNewWindow() {
       return
     }
     
-    // For regular tabs, move to new window
+    // Handle search results
+    if (selectedTab.classList.contains('archy-search-result')) {
+      const resultType = selectedTab.getAttribute('data-result-type')
+      
+      if (resultType === 'tab') {
+        // Move existing tab to new window
+        const tabId = parseInt(selectedTab.getAttribute('data-tab-id') || '0')
+        if (tabId) {
+          chrome.runtime.sendMessage({
+            type: 'MOVE_TAB_TO_NEW_WINDOW',
+            tabId: tabId
+          })
+          closeOverlay()
+        }
+      } else {
+        // Open bookmark or history item in new window
+        const url = selectedTab.querySelector('.archy-tab-url')?.textContent || ''
+        if (url) {
+          chrome.runtime.sendMessage({
+            type: 'OPEN_SEARCH_RESULT',
+            result: { url, type: resultType },
+            newWindow: true
+          })
+          closeOverlay()
+        }
+      }
+      return
+    }
+    
+    // For regular tabs, move to new window (fallback)
     const tabId = parseInt(selectedTab.getAttribute('data-tab-id') || '0')
     if (tabId) {
       chrome.runtime.sendMessage({
